@@ -1,10 +1,10 @@
 import requests
-from newspaper import Article
 from readability import Document
 from bs4 import BeautifulSoup
 from datetime import datetime
 from typing import Optional, Dict
 import logging
+from urllib.parse import urlparse
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -17,16 +17,37 @@ class ArticleParser:
         }
 
     def parse(self, url: str) -> Dict:
-        """Parse article from URL using multiple methods"""
+        """Parse article from URL"""
         try:
-            # Try newspaper3k first
-            article_data = self._parse_with_newspaper(url)
+            response = requests.get(url, headers=self.headers, timeout=10)
+            response.raise_for_status()
 
-            # If newspaper fails, try readability
-            if not article_data.get('content'):
-                article_data = self._parse_with_readability(url)
+            # Parse with readability
+            doc = Document(response.content)
+            soup = BeautifulSoup(doc.summary(), 'html.parser')
+            full_soup = BeautifulSoup(response.content, 'html.parser')
 
-            return article_data
+            # Extract text content
+            content = soup.get_text(separator='\n', strip=True)
+
+            # Create excerpt
+            excerpt = content[:300] + '...' if len(content) > 300 else content
+
+            # Try to extract author from meta tags
+            author = self._extract_author(full_soup)
+
+            # Try to extract published date
+            published_date = self._extract_date(full_soup)
+
+            return {
+                'url': url,
+                'title': doc.title(),
+                'content': content,
+                'excerpt': excerpt,
+                'author': author,
+                'published_date': published_date,
+                'site_name': self._extract_site_name(url)
+            }
         except Exception as e:
             logger.error(f"Error parsing article {url}: {str(e)}")
             return {
@@ -36,66 +57,53 @@ class ArticleParser:
                 'excerpt': None,
                 'author': None,
                 'published_date': None,
-                'site_name': None
-            }
-
-    def _parse_with_newspaper(self, url: str) -> Dict:
-        """Parse using newspaper3k library"""
-        try:
-            article = Article(url)
-            article.download()
-            article.parse()
-
-            # Extract metadata
-            excerpt = article.meta_description or (
-                article.text[:300] + '...' if len(article.text) > 300 else article.text
-            )
-
-            return {
-                'url': url,
-                'title': article.title,
-                'content': article.text,
-                'excerpt': excerpt,
-                'author': ', '.join(article.authors) if article.authors else None,
-                'published_date': article.publish_date,
                 'site_name': self._extract_site_name(url)
             }
-        except Exception as e:
-            logger.warning(f"Newspaper3k parsing failed for {url}: {str(e)}")
-            return {}
 
-    def _parse_with_readability(self, url: str) -> Dict:
-        """Parse using readability-lxml as fallback"""
+    def _extract_author(self, soup: BeautifulSoup) -> Optional[str]:
+        """Try to extract author from meta tags"""
         try:
-            response = requests.get(url, headers=self.headers, timeout=10)
-            response.raise_for_status()
+            # Try various meta tags for author
+            author_selectors = [
+                {'name': 'author'},
+                {'property': 'article:author'},
+                {'name': 'twitter:creator'},
+                {'property': 'og:article:author'}
+            ]
 
-            doc = Document(response.content)
-            soup = BeautifulSoup(doc.summary(), 'html.parser')
+            for selector in author_selectors:
+                tag = soup.find('meta', attrs=selector)
+                if tag and tag.get('content'):
+                    return tag.get('content')
 
-            # Extract text content
-            content = soup.get_text(separator='\n', strip=True)
+            return None
+        except:
+            return None
 
-            # Create excerpt
-            excerpt = content[:300] + '...' if len(content) > 300 else content
+    def _extract_date(self, soup: BeautifulSoup) -> Optional[datetime]:
+        """Try to extract published date from meta tags"""
+        try:
+            # Try various meta tags for date
+            date_selectors = [
+                {'property': 'article:published_time'},
+                {'name': 'publish_date'},
+                {'property': 'og:published_time'},
+                {'name': 'date'}
+            ]
 
-            return {
-                'url': url,
-                'title': doc.title(),
-                'content': content,
-                'excerpt': excerpt,
-                'author': None,
-                'published_date': None,
-                'site_name': self._extract_site_name(url)
-            }
-        except Exception as e:
-            logger.warning(f"Readability parsing failed for {url}: {str(e)}")
-            return {}
+            for selector in date_selectors:
+                tag = soup.find('meta', attrs=selector)
+                if tag and tag.get('content'):
+                    from dateutil import parser
+                    return parser.parse(tag.get('content'))
+
+            return None
+        except:
+            return None
 
     def _extract_site_name(self, url: str) -> str:
         """Extract site name from URL"""
         try:
-            from urllib.parse import urlparse
             parsed = urlparse(url)
             domain = parsed.netloc
             # Remove www. if present

@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Reader</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+    <!-- Auth Section (Login/Register) -->
+    <div id="auth-section" class="auth-container">
+        <div class="auth-box">
+            <h1 class="logo">📚 Web Reader</h1>
+            <p class="tagline">Your personal read-it-later app</p>
+
+            <div id="login-form" class="form-container">
+                <h2>Login</h2>
+                <form id="login-form-element">
+                    <input type="text" id="login-username" placeholder="Username" required>
+                    <input type="password" id="login-password" placeholder="Password" required>
+                    <button type="submit" class="btn btn-primary">Login</button>
+                </form>
+                <p class="form-switch">
+                    Don't have an account? <a href="#" id="show-register">Register</a>
+                </p>
+            </div>
+
+            <div id="register-form" class="form-container" style="display: none;">
+                <h2>Register</h2>
+                <form id="register-form-element">
+                    <input type="email" id="register-email" placeholder="Email" required>
+                    <input type="text" id="register-username" placeholder="Username" required>
+                    <input type="password" id="register-password" placeholder="Password" required>
+                    <button type="submit" class="btn btn-primary">Register</button>
+                </form>
+                <p class="form-switch">
+                    Already have an account? <a href="#" id="show-login">Login</a>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main App Section -->
+    <div id="app-section" style="display: none;">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-left">
+                <h1 class="app-logo">📚 Web Reader</h1>
+            </div>
+            <div class="header-center">
+                <div class="add-article-form">
+                    <input type="url" id="new-article-url" placeholder="Paste URL to save article...">
+                    <button id="add-article-btn" class="btn btn-primary">Save</button>
+                </div>
+            </div>
+            <div class="header-right">
+                <button id="theme-toggle" class="btn btn-icon" title="Toggle theme">🌙</button>
+                <span id="user-name" class="user-name"></span>
+                <button id="logout-btn" class="btn btn-secondary">Logout</button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <div class="main-container">
+            <!-- Sidebar -->
+            <aside class="sidebar">
+                <div class="sidebar-section">
+                    <h3>Library</h3>
+                    <nav class="sidebar-nav">
+                        <a href="#" class="nav-item active" data-filter="all">All Articles</a>
+                        <a href="#" class="nav-item" data-filter="favorite">Favorites</a>
+                        <a href="#" class="nav-item" data-filter="archived">Archive</a>
+                    </nav>
+                </div>
+
+                <div class="sidebar-section">
+                    <div class="section-header">
+                        <h3>Tags</h3>
+                        <button id="add-tag-btn" class="btn btn-icon-small" title="Add tag">+</button>
+                    </div>
+                    <div id="tags-list" class="tags-list"></div>
+                </div>
+
+                <div class="sidebar-section">
+                    <input type="text" id="search-input" placeholder="Search articles..." class="search-input">
+                </div>
+            </aside>
+
+            <!-- Article List -->
+            <main class="content-area">
+                <div id="article-list" class="article-list"></div>
+            </main>
+
+            <!-- Article Reader -->
+            <div id="article-reader" class="article-reader" style="display: none;">
+                <div class="reader-header">
+                    <button id="close-reader" class="btn btn-secondary">← Back to List</button>
+                    <div class="reader-actions">
+                        <button id="favorite-btn" class="btn btn-icon" title="Favorite">⭐</button>
+                        <button id="archive-btn" class="btn btn-icon" title="Archive">📦</button>
+                        <button id="delete-article-btn" class="btn btn-icon" title="Delete">🗑️</button>
+                    </div>
+                </div>
+                <article class="reader-content">
+                    <h1 id="reader-title"></h1>
+                    <div class="reader-meta">
+                        <span id="reader-author"></span>
+                        <span id="reader-date"></span>
+                        <span id="reader-site"></span>
+                    </div>
+                    <div id="reader-tags" class="reader-tags"></div>
+                    <div id="reader-body" class="reader-body"></div>
+                </article>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

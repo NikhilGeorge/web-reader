@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  web-reader:
+    build: .
+    container_name: web-reader
+    ports:
+      - "8000:8000"
+    volumes:
+      # Persist database
+      - web-reader-data:/app/data
+    environment:
+      # Application settings
+      - APP_NAME=Web Reader
+      - DEBUG=false
+
+      # Security - CHANGE THIS IN PRODUCTION!
+      - SECRET_KEY=your-super-secret-key-change-this-in-production-please
+
+      # Token expiration (in minutes) - 7 days
+      - ACCESS_TOKEN_EXPIRE_MINUTES=10080
+
+      # Database
+      - DATABASE_URL=sqlite:///./data/webreader.db
+
+      # CORS (adjust as needed)
+      - CORS_ORIGINS=["*"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/api/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  web-reader-data:
+    driver: local

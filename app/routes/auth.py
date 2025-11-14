@@ -1,98 +1,103 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordRequestForm
+from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi.responses import RedirectResponse
 from datetime import timedelta
-from app.schemas import UserCreate, UserResponse, Token
-from app.auth import get_password_hash, verify_password, create_access_token, get_current_user
+from app.schemas import UserResponse
+from app.auth import get_password_hash, create_access_token, get_current_user
 from app.config import settings
 from app.storage import storage
+from app.oauth import oauth
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
-
-
-@router.get("/config")
-def get_auth_config():
-    """Return authentication configuration"""
-    return {
-        "auth_enabled": not settings.disable_auth,
-        "default_user": settings.default_user if settings.disable_auth else None
-    }
-
-
-@router.get("/auto-login", response_model=Token)
-def auto_login():
-    """Auto-login when authentication is disabled"""
-    if not settings.disable_auth:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Auto-login is only available when authentication is disabled"
-        )
-
-    # Ensure default user exists
-    user = storage.get_user_by_username(settings.default_user)
-    if not user:
-        user = storage.create_user(
-            email=f"{settings.default_user}@example.com",
-            username=settings.default_user,
-            hashed_password=get_password_hash("password")
-        )
-
-    # Create access token
-    access_token_expires = timedelta(minutes=settings.access_token_expire_minutes)
-    access_token = create_access_token(
-        data={"sub": user["username"]}, expires_delta=access_token_expires
-    )
-
-    return {"access_token": access_token, "token_type": "bearer"}
-
-
-@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-def register(user: UserCreate):
-    # Check if user already exists
-    existing_user = storage.get_user_by_email(user.email) or storage.get_user_by_username(user.username)
-
-    if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email or username already registered"
-        )
-
-    # Create new user
-    hashed_password = get_password_hash(user.password)
-    try:
-        new_user = storage.create_user(
-            email=user.email,
-            username=user.username,
-            hashed_password=hashed_password
-        )
-        return new_user
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
-
-
-@router.post("/login", response_model=Token)
-def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    # Authenticate user
-    user = storage.get_user_by_username(form_data.username)
-
-    if not user or not verify_password(form_data.password, user["hashed_password"]):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    # Create access token
-    access_token_expires = timedelta(minutes=settings.access_token_expire_minutes)
-    access_token = create_access_token(
-        data={"sub": user["username"]}, expires_delta=access_token_expires
-    )
-
-    return {"access_token": access_token, "token_type": "bearer"}
 
 
 @router.get("/me", response_model=UserResponse)
 def get_current_user_info(current_user: dict = Depends(get_current_user)):
     return current_user
+
+
+# Google OAuth routes
+@router.get("/google/login")
+async def google_login(request: Request):
+    """Initiate Google OAuth login flow"""
+    if not settings.enable_google_oauth:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Google OAuth is not enabled"
+        )
+
+    redirect_uri = settings.google_redirect_uri or str(request.url_for('google_callback'))
+    return await oauth.google.authorize_redirect(request, redirect_uri)
+
+
+@router.get("/google/callback", name="google_callback")
+async def google_callback(request: Request):
+    """Handle Google OAuth callback"""
+    if not settings.enable_google_oauth:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Google OAuth is not enabled"
+        )
+
+    try:
+        # Get OAuth token from Google
+        token = await oauth.google.authorize_access_token(request)
+
+        # Get user info from Google
+        user_info = token.get('userinfo')
+        if not user_info:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Failed to get user information from Google"
+            )
+
+        email = user_info.get('email')
+        if not email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email not provided by Google"
+            )
+
+        # Check if email is in allowed list
+        allowed_emails_list = [e.strip() for e in settings.allowed_emails.split(',') if e.strip()]
+        if allowed_emails_list and email not in allowed_emails_list:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Your email is not authorized to access this application"
+            )
+
+        # Get or create user
+        user = storage.get_user_by_email(email)
+        if not user:
+            # Create username from email
+            username = email.split('@')[0]
+            # Ensure username is unique
+            existing = storage.get_user_by_username(username)
+            counter = 1
+            while existing:
+                username = f"{email.split('@')[0]}{counter}"
+                existing = storage.get_user_by_username(username)
+                counter += 1
+
+            # Create user with random password (not used for OAuth)
+            import secrets
+            random_password = secrets.token_urlsafe(32)
+            user = storage.create_user(
+                email=email,
+                username=username,
+                hashed_password=get_password_hash(random_password)
+            )
+
+        # Create access token
+        access_token_expires = timedelta(minutes=settings.access_token_expire_minutes)
+        access_token = create_access_token(
+            data={"sub": user["username"]}, expires_delta=access_token_expires
+        )
+
+        # Redirect to frontend with token
+        return RedirectResponse(url=f"/?token={access_token}")
+
+    except Exception as e:
+        # Log the error and redirect to login with error
+        import traceback
+        traceback.print_exc()
+        return RedirectResponse(url=f"/?error=auth_failed&message={str(e)}")

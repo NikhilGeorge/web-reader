@@ -38,22 +38,26 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('theme-toggle').textContent = '☀️';
     }
 
-    // Check auth configuration first
-    try {
-        const authConfig = await fetch('/api/auth/config').then(r => r.json());
+    // Google OAuth is always enabled in this implementation
+    // No need to check auth config
 
-        if (!authConfig.auth_enabled) {
-            // Auth is disabled, auto-login
-            const response = await fetch('/api/auth/auto-login');
-            if (response.ok) {
-                const data = await response.json();
-                localStorage.setItem('token', data.access_token);
-                await fetchCurrentUser();
-                return; // Skip setting up login form listeners
-            }
-        }
-    } catch (error) {
-        console.log('Auth config check failed, proceeding with normal auth');
+    // Check for token in URL (from OAuth callback)
+    const urlParams = new URLSearchParams(window.location.search);
+    const tokenFromUrl = urlParams.get('token');
+    const errorFromUrl = urlParams.get('error');
+
+    if (tokenFromUrl) {
+        // Store token and remove from URL
+        localStorage.setItem('token', tokenFromUrl);
+        window.history.replaceState({}, document.title, window.location.pathname);
+        await fetchCurrentUser();
+        return;
+    }
+
+    if (errorFromUrl) {
+        const message = urlParams.get('message') || 'Authentication failed';
+        alert(`Error: ${message}`);
+        window.history.replaceState({}, document.title, window.location.pathname);
     }
 
     // Check if user is logged in
@@ -62,81 +66,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         fetchCurrentUser();
     }
 
-    // Auth event listeners (only needed if showing login form)
-    document.getElementById('show-register').addEventListener('click', (e) => {
-        e.preventDefault();
-        document.getElementById('login-form').classList.add('hidden');
-        document.getElementById('register-form').classList.remove('hidden');
-    });
-
-    document.getElementById('show-login').addEventListener('click', (e) => {
-        e.preventDefault();
-        document.getElementById('register-form').classList.add('hidden');
-        document.getElementById('login-form').classList.remove('hidden');
-    });
-
-    document.getElementById('login-form-element').addEventListener('submit', handleLogin);
-    document.getElementById('register-form-element').addEventListener('submit', handleRegister);
+    // Google OAuth login button
+    const googleLoginBtn = document.getElementById('google-login-btn');
+    if (googleLoginBtn) {
+        googleLoginBtn.addEventListener('click', () => {
+            window.location.href = '/api/auth/google/login';
+        });
+    }
 });
 
 // Authentication
-async function handleLogin(e) {
-    e.preventDefault();
-    const username = document.getElementById('login-username').value;
-    const password = document.getElementById('login-password').value;
-
-    try {
-        const formData = new URLSearchParams();
-        formData.append('username', username);
-        formData.append('password', password);
-
-        const response = await fetch(`${API_BASE}/auth/login`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: formData
-        });
-
-        if (!response.ok) {
-            throw new Error('Login failed');
-        }
-
-        const data = await response.json();
-        localStorage.setItem('token', data.access_token);
-        await fetchCurrentUser();
-        showToast('Login successful!', 'success');
-    } catch (error) {
-        showToast('Login failed. Please check your credentials.', 'error');
-    }
-}
-
-async function handleRegister(e) {
-    e.preventDefault();
-    const email = document.getElementById('register-email').value;
-    const username = document.getElementById('register-username').value;
-    const password = document.getElementById('register-password').value;
-
-    try {
-        const response = await fetch(`${API_BASE}/auth/register`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ email, username, password })
-        });
-
-        if (!response.ok) {
-            throw new Error('Registration failed');
-        }
-
-        showToast('Registration successful! Please login.', 'success');
-        document.getElementById('show-login').click();
-    } catch (error) {
-        showToast('Registration failed. Username or email may already exist.', 'error');
-    }
-}
-
 async function fetchCurrentUser() {
     try {
         const response = await apiRequest('/auth/me');

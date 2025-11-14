@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 from app.config import settings
 from app.routes import auth, articles, tags, highlights, pdfs
 from app.storage import storage
@@ -24,6 +25,15 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+
+# Session middleware (required for OAuth)
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=settings.secret_key,
+    max_age=3600,  # 1 hour session timeout
+    same_site="lax",
+    https_only=False,  # Set to True in production with HTTPS
 )
 
 # API routes

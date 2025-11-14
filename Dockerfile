@@ -23,12 +23,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY app/ ./app/
 COPY static/ ./static/
-COPY .env.example .env
 
 # Create data directory for file-based storage
 RUN mkdir -p /app/data
 
-# Expose port
+# Expose port (Cloud Run will set PORT env variable)
 EXPOSE 8000
 
 # Environment variables
@@ -36,8 +35,10 @@ ENV PYTHONUNBUFFERED=1
 ENV DATA_PATH=/app/data
 
 # Health check (checks if the app is responding)
+# Note: Cloud Run has its own health checks, but this is useful for local testing
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/auth/config')"
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"
 
 # Run the application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Cloud Run will provide PORT env variable, default to 8000 for local development
+CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}

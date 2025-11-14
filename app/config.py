@@ -14,6 +14,13 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 60 * 24 * 7  # 7 days
     disable_auth: bool = False  # Set to True to disable authentication
 
+    # Google OAuth
+    google_client_id: Optional[str] = None
+    google_client_secret: Optional[str] = None
+    google_redirect_uri: Optional[str] = None  # e.g., https://your-app.run.app/api/auth/google/callback
+    allowed_emails: str = ""  # Comma-separated list of allowed email addresses
+    enable_google_oauth: bool = False  # Set to True to enable Google OAuth
+
     # Storage
     data_path: str = "./data"
     default_user: str = "demo"  # Default user when auth is disabled

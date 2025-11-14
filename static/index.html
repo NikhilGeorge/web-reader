@@ -252,7 +252,94 @@
         .dark .modal-content {
             background: #1f2937;
         }
+
+        /* PDF Viewer styles */
+        #pdf-viewer {
+            position: relative;
+            background: #525659;
+            min-height: 400px;
+        }
+        #pdf-canvas {
+            display: block;
+            margin: 0 auto;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+        }
+        #pdf-text-layer {
+            position: absolute;
+            left: 50%;
+            top: 0;
+            transform: translateX(-50%);
+            overflow: hidden;
+            opacity: 0.2;
+            line-height: 1.0;
+            user-select: text;
+            cursor: text;
+        }
+        #pdf-text-layer > span {
+            color: transparent;
+            position: absolute;
+            white-space: pre;
+            cursor: text;
+            transform-origin: 0% 0%;
+        }
+        #pdf-text-layer > span.highlighted {
+            background-color: rgba(251, 191, 36, 0.3);
+        }
+        #pdf-text-layer > span.annotated {
+            background-color: rgba(251, 191, 36, 0.4);
+            border-bottom: 2px solid #f59e0b;
+        }
+        .pdf-controls {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            padding: 16px;
+            background: #374151;
+            border-bottom: 1px solid #4b5563;
+        }
+        .pdf-controls button {
+            padding: 8px 16px;
+            background: #4b5563;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background-color 0.2s;
+        }
+        .pdf-controls button:hover:not(:disabled) {
+            background: #6b7280;
+        }
+        .pdf-controls button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .pdf-controls span {
+            color: #d1d5db;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        /* PDF Floating Controls Auto-hide */
+        .pdf-floating-controls {
+            z-index: 60;
+        }
+        #pdf-header.hidden-controls {
+            transform: translateY(-100%);
+        }
+        #pdf-controls.hidden-controls {
+            transform: translate(-50%, 100%);
+        }
     </style>
+
+    <!-- PDF.js Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        // Configure PDF.js worker
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
 </head>
 <body class="bg-gray-50 dark:bg-gray-900 transition-colors">
     <!-- Auth Section (Login/Register) -->
@@ -315,6 +402,10 @@
                             class="flex-1 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition">
                         <button id="add-article-btn" class="bg-primary-600 hover:bg-primary-700 text-white font-semibold px-6 py-2 rounded-lg transition whitespace-nowrap">
                             Save
+                        </button>
+                        <input type="file" id="pdf-file-input" accept="application/pdf" class="hidden">
+                        <button id="upload-pdf-btn" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold px-6 py-2 rounded-lg transition whitespace-nowrap">
+                            📄 Upload PDF
                         </button>
                     </div>
                 </div>
@@ -400,6 +491,58 @@
                     </article>
                 </div>
             </div>
+
+            <!-- PDF Reader (Full Screen) -->
+            <div id="pdf-reader" class="hidden fixed inset-0 bg-gray-900 z-50">
+                <!-- Floating Header (Top) -->
+                <div id="pdf-header" class="pdf-floating-controls absolute top-0 left-0 right-0 bg-gray-900/95 backdrop-blur-sm border-b border-gray-700 px-4 py-3 flex items-center justify-between transition-transform duration-300">
+                    <button id="close-pdf-reader" class="flex items-center gap-2 text-gray-400 hover:text-white transition font-medium">
+                        <span>←</span>
+                        <span>Back</span>
+                    </button>
+                    <h2 id="pdf-title" class="text-sm font-semibold text-white truncate max-w-md"></h2>
+                    <div class="flex items-center gap-2">
+                        <button id="pdf-favorite-btn" class="p-2 rounded-lg hover:bg-gray-800 transition text-lg" title="Favorite">⭐</button>
+                        <button id="pdf-archive-btn" class="p-2 rounded-lg hover:bg-gray-800 transition text-lg" title="Archive">📦</button>
+                        <button id="delete-pdf-btn" class="p-2 rounded-lg hover:bg-red-900/20 text-red-400 transition text-lg" title="Delete">🗑️</button>
+                    </div>
+                </div>
+
+                <!-- PDF Viewer Container -->
+                <div id="pdf-viewer-container" class="w-full h-full overflow-auto bg-gray-900">
+                    <div id="pdf-viewer">
+                        <canvas id="pdf-canvas"></canvas>
+                        <div id="pdf-text-layer"></div>
+                    </div>
+                </div>
+
+                <!-- Floating Controls (Bottom) -->
+                <div id="pdf-controls" class="pdf-floating-controls absolute bottom-0 left-1/2 transform -translate-x-1/2 bg-gray-800/95 backdrop-blur-sm rounded-t-xl px-6 py-3 flex items-center gap-4 shadow-xl transition-transform duration-300">
+                    <button id="pdf-prev-page" class="p-2 rounded-lg hover:bg-gray-700 text-white transition" title="Previous Page">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                        </svg>
+                    </button>
+                    <span id="pdf-page-info" class="text-white text-sm font-medium min-w-[100px] text-center">Page 1 of 1</span>
+                    <button id="pdf-next-page" class="p-2 rounded-lg hover:bg-gray-700 text-white transition" title="Next Page">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                        </svg>
+                    </button>
+                    <div class="w-px h-6 bg-gray-600"></div>
+                    <button id="pdf-zoom-out" class="p-2 rounded-lg hover:bg-gray-700 text-white transition" title="Zoom Out">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7"></path>
+                        </svg>
+                    </button>
+                    <span id="pdf-zoom-level" class="text-white text-sm font-medium min-w-[50px] text-center">100%</span>
+                    <button id="pdf-zoom-in" class="p-2 rounded-lg hover:bg-gray-700 text-white transition" title="Zoom In">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -420,11 +563,12 @@
             </svg>
             Annotate
         </button>
+        <button id="close-highlight-popup" title="Close" style="padding: 4px 8px; font-size: 18px; line-height: 1;">×</button>
     </div>
 
     <!-- Annotation Modal (hidden by default, will be created dynamically) -->
     <div id="annotation-modal" class="hidden"></div>
 
-    <script src="/static/js/app.js?v=13"></script>
+    <script src="/static/js/app.js?v=35"></script>
 </body>
 </html>

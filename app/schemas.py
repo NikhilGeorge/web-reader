@@ -52,13 +52,14 @@ class TagResponse(TagBase):
 class HighlightPosition(BaseModel):
     start: int
     end: int
+    page: Optional[int] = None  # PDF page number (1-indexed)
 
 
 class HighlightBase(BaseModel):
     type: str = Field(..., pattern="^(highlight|annotation)$")  # Either highlight or annotation
     text: str  # Selected text snippet
     context: Optional[str] = None  # Surrounding text for matching
-    position: HighlightPosition  # Character offsets
+    position: HighlightPosition  # Character offsets (and page for PDFs)
     color: str = "#fbbf24"  # Default yellow
     note: Optional[str] = None  # Annotation text (required for type=annotation)
     tags: List[str] = []  # Tags for categorization
@@ -122,4 +123,31 @@ class ArticleResponse(BaseModel):
 
 class ArticleDetailResponse(ArticleResponse):
     content: Optional[str] = None
+    highlights: List[HighlightResponse] = []
+
+
+# PDF Schemas
+class PDFUpload(BaseModel):
+    title: Optional[str] = None
+    tags: Optional[List[str]] = []
+
+
+class PDFResponse(BaseModel):
+    id: str
+    filename: str
+    title: Optional[str] = None
+    file_size: int
+    page_count: Optional[int] = None
+    is_archived: bool
+    is_favorite: bool
+    reading_progress: int
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    tags: List[TagResponse] = []
+
+    class Config:
+        from_attributes = True
+
+
+class PDFDetailResponse(PDFResponse):
     highlights: List[HighlightResponse] = []

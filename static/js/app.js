@@ -4,6 +4,7 @@ const API_BASE = '/api';
 // State
 let currentUser = null;
 let articles = [];
+let pdfs = [];
 let tags = [];
 let currentFilter = 'all';
 let currentTag = null;
@@ -172,28 +173,42 @@ function showApp() {
 // Articles
 async function loadArticles() {
     try {
-        let url = '/articles?limit=100';
+        let articleUrl = '/articles?limit=100';
+        let pdfUrl = '/pdfs?';
 
         if (currentFilter === 'favorite') {
-            url += '&favorite=true';
+            articleUrl += '&favorite=true';
+            pdfUrl += '&favorite=true';
         } else if (currentFilter === 'archived') {
-            url += '&archived=true';
+            articleUrl += '&archived=true';
+            pdfUrl += '&archived=true';
         } else if (currentFilter === 'all') {
-            url += '&archived=false';
+            articleUrl += '&archived=false';
+            pdfUrl += '&archived=false';
         }
 
         if (currentTag) {
-            url += `&tag=${encodeURIComponent(currentTag)}`;
+            articleUrl += `&tag=${encodeURIComponent(currentTag)}`;
+            pdfUrl += `&tag=${encodeURIComponent(currentTag)}`;
         }
 
         if (searchQuery) {
-            url += `&search=${encodeURIComponent(searchQuery)}`;
+            articleUrl += `&search=${encodeURIComponent(searchQuery)}`;
+            pdfUrl += `&search=${encodeURIComponent(searchQuery)}`;
         }
 
-        articles = await apiRequest(url);
+        // Fetch both articles and PDFs in parallel
+        const [fetchedArticles, fetchedPDFs] = await Promise.all([
+            apiRequest(articleUrl),
+            apiRequest(pdfUrl)
+        ]);
+
+        articles = fetchedArticles;
+        pdfs = fetchedPDFs || [];
+
         renderArticles();
     } catch (error) {
-        showToast('Failed to load articles', 'error');
+        showToast('Failed to load content', 'error');
     }
 }
 
@@ -201,43 +216,88 @@ function renderArticles() {
     const container = document.getElementById('article-list');
     container.innerHTML = '';
 
-    if (articles.length === 0) {
-        container.innerHTML = '<div class="col-span-full text-center py-12 text-gray-500 dark:text-gray-400">No articles found. Add one to get started!</div>';
+    const totalItems = articles.length + pdfs.length;
+
+    if (totalItems === 0) {
+        container.innerHTML = '<div class="col-span-full text-center py-12 text-gray-500 dark:text-gray-400">No content found. Add articles or upload PDFs to get started!</div>';
         return;
     }
 
-    articles.forEach(article => {
+    // Combine and sort all items by date
+    const allItems = [
+        ...articles.map(a => ({ ...a, type: 'article' })),
+        ...pdfs.map(p => ({ ...p, type: 'pdf' }))
+    ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+    allItems.forEach(item => {
         const card = document.createElement('div');
         card.className = 'bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5 hover:shadow-lg dark:hover:shadow-gray-900/50 transition cursor-pointer';
-        card.onclick = () => openArticle(article.id);
 
-        const tagsHtml = article.tags.map(tag =>
+        if (item.type === 'article') {
+            card.onclick = () => openArticle(item.id);
+        } else {
+            card.onclick = () => openPDF(item.id);
+        }
+
+        const tagsHtml = item.tags.map(tag =>
             `<span class="inline-block px-2 py-1 text-xs font-medium rounded" style="background: ${tag.color}20; color: ${tag.color}">${tag.name}</span>`
         ).join('');
 
-        const date = new Date(article.created_at).toLocaleDateString();
-        const favoriteIcon = article.is_favorite ? '⭐' : '';
-        const archiveIcon = article.is_archived ? '📦' : '';
+        const date = new Date(item.created_at).toLocaleDateString();
+        const favoriteIcon = item.is_favorite ? '⭐' : '';
+        const archiveIcon = item.is_archived ? '📦' : '';
+        const typeIcon = item.type === 'pdf' ? '📄' : '📰';
 
-        card.innerHTML = `
-            <div class="flex justify-between items-start mb-3">
-                <div class="flex-1">
-                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2 line-clamp-2">${article.title || 'Untitled'}</h3>
-                    <div class="flex flex-wrap items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                        ${article.site_name ? `<span>${article.site_name}</span>` : ''}
-                        ${article.author ? `<span class="before:content-['•'] before:mx-2">by ${article.author}</span>` : ''}
-                        <span class="before:content-['•'] before:mx-2">${date}</span>
+        if (item.type === 'article') {
+            card.innerHTML = `
+                <div class="flex justify-between items-start mb-3">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="text-xl">${typeIcon}</span>
+                            <h3 class="text-lg font-semibold text-gray-900 dark:text-white line-clamp-2">${item.title || 'Untitled'}</h3>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                            ${item.site_name ? `<span>${item.site_name}</span>` : ''}
+                            ${item.author ? `<span class="before:content-['•'] before:mx-2">by ${item.author}</span>` : ''}
+                            <span class="before:content-['•'] before:mx-2">${date}</span>
+                        </div>
+                    </div>
+                    <div class="flex gap-1 text-lg">
+                        ${favoriteIcon} ${archiveIcon}
                     </div>
                 </div>
-                <div class="flex gap-1 text-lg">
-                    ${favoriteIcon} ${archiveIcon}
+                ${item.excerpt ? `<p class="text-gray-600 dark:text-gray-300 text-sm line-clamp-3 mb-3">${item.excerpt}</p>` : ''}
+                <div class="flex flex-wrap gap-2 mt-3">
+                    ${tagsHtml}
                 </div>
-            </div>
-            ${article.excerpt ? `<p class="text-gray-600 dark:text-gray-300 text-sm line-clamp-3 mb-3">${article.excerpt}</p>` : ''}
-            <div class="flex flex-wrap gap-2 mt-3">
-                ${tagsHtml}
-            </div>
-        `;
+            `;
+        } else {
+            // PDF card
+            const pageInfo = item.page_count ? `${item.page_count} pages` : '';
+            const sizeInfo = item.file_size ? `${(item.file_size / 1024 / 1024).toFixed(1)} MB` : '';
+
+            card.innerHTML = `
+                <div class="flex justify-between items-start mb-3">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="text-xl">${typeIcon}</span>
+                            <h3 class="text-lg font-semibold text-gray-900 dark:text-white line-clamp-2">${item.title || item.filename}</h3>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                            ${pageInfo ? `<span>${pageInfo}</span>` : ''}
+                            ${sizeInfo ? `<span class="before:content-['•'] before:mx-2">${sizeInfo}</span>` : ''}
+                            <span class="before:content-['•'] before:mx-2">${date}</span>
+                        </div>
+                    </div>
+                    <div class="flex gap-1 text-lg">
+                        ${favoriteIcon} ${archiveIcon}
+                    </div>
+                </div>
+                <div class="flex flex-wrap gap-2 mt-3">
+                    ${tagsHtml}
+                </div>
+            `;
+        }
 
         container.appendChild(card);
     });
@@ -511,6 +571,7 @@ function showToast(message, type = 'success') {
 let currentSelection = null;
 let currentHighlights = [];
 let highlightSystemInitialized = false;
+let isClosingPopup = false;  // Flag to prevent popup from re-showing after explicit close
 
 function initializeHighlightSystem() {
     if (highlightSystemInitialized) return;
@@ -527,27 +588,105 @@ function initializeHighlightSystem() {
     readerBody.addEventListener('mouseup', handleTextSelection);
 
     // Handle highlight popup buttons
-    document.getElementById('highlight-btn').addEventListener('click', () => {
-        createHighlight('highlight');
-        hideHighlightPopup();
-    });
+    const highlightBtn = document.getElementById('highlight-btn');
+    const annotateBtn = document.getElementById('annotate-btn');
+    const closePopupBtn = document.getElementById('close-highlight-popup');
 
-    document.getElementById('annotate-btn').addEventListener('click', () => {
-        showAnnotationModal();
-    });
+    if (highlightBtn) {
+        highlightBtn.addEventListener('click', () => {
+            createHighlight('highlight');
+            hideHighlightPopup();
+        });
+    }
+
+    if (annotateBtn) {
+        annotateBtn.addEventListener('click', () => {
+            showAnnotationModal();
+        });
+    }
+
+    if (closePopupBtn) {
+        // Use mousedown instead of click to fire before mouseup/text selection
+        closePopupBtn.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            isClosingPopup = true;  // Set flag to prevent re-showing
+            hideHighlightPopup();
+            // Reset flag after a short delay
+            setTimeout(() => {
+                isClosingPopup = false;
+            }, 150);
+        });
+    } else {
+        console.error('Close highlight popup button not found');
+    }
 
     // Hide popup when clicking elsewhere
     document.addEventListener('mousedown', (e) => {
+        // Check if we're already in the process of closing
+        if (isClosingPopup) {
+            return;
+        }
+
+        // Only hide if popup is currently visible
+        if (popup.classList.contains('hidden')) {
+            return;
+        }
+
+        // Don't hide if clicking on the popup itself or the close button
         if (!popup.contains(e.target) && !e.target.closest('#annotation-modal')) {
+            isClosingPopup = true;  // Set flag when closing via click outside
             hideHighlightPopup();
+            setTimeout(() => {
+                isClosingPopup = false;
+            }, 150);
+        }
+    });
+
+    // Hide popup and modal on ESC key
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' || e.key === 'Esc') {
+            // Close annotation modal if open
+            const modalContainer = document.getElementById('annotation-modal');
+            if (modalContainer && !modalContainer.classList.contains('hidden')) {
+                modalContainer.classList.add('hidden');
+                isClosingPopup = true;
+                hideHighlightPopup();
+                setTimeout(() => {
+                    isClosingPopup = false;
+                }, 100);
+                e.preventDefault();
+                return;
+            }
+
+            // Close highlight popup if visible
+            if (popup && !popup.classList.contains('hidden')) {
+                isClosingPopup = true;
+                hideHighlightPopup();
+                setTimeout(() => {
+                    isClosingPopup = false;
+                }, 100);
+                e.preventDefault();
+            }
         }
     });
 
     highlightSystemInitialized = true;
-    console.log('Highlight system initialized');
 }
 
 function handleTextSelection(e) {
+    // Don't show popup if we're in the process of closing it
+    if (isClosingPopup) {
+        return;
+    }
+
+    // Don't show popup if clicking on the popup itself
+    const popup = document.getElementById('highlight-popup');
+    if (popup && popup.contains(e.target)) {
+        return;
+    }
+
     const selection = window.getSelection();
     const selectedText = selection.toString().trim();
 
@@ -576,6 +715,7 @@ function handleTextSelection(e) {
 function showHighlightPopup(x, y) {
     const popup = document.getElementById('highlight-popup');
     popup.classList.remove('hidden');
+    popup.style.display = 'flex';  // Force show with inline style
 
     // Account for page scroll
     const scrollY = window.pageYOffset || document.documentElement.scrollTop;
@@ -602,42 +742,126 @@ function showHighlightPopup(x, y) {
 }
 
 function hideHighlightPopup() {
-    document.getElementById('highlight-popup').classList.add('hidden');
+    const popup = document.getElementById('highlight-popup');
+    if (popup) {
+        popup.classList.add('hidden');
+        popup.style.display = 'none';  // Force hide with inline style
+        // Clear selection when hiding popup
+        window.getSelection().removeAllRanges();
+        currentSelection = null;
+    }
+}
+
+function handlePDFTextSelection(e) {
+    // Don't show popup if we're in the process of closing it
+    if (isClosingPopup) {
+        return;
+    }
+
+    // Don't show popup if clicking on the popup itself
+    const popup = document.getElementById('highlight-popup');
+    if (popup && popup.contains(e.target)) {
+        return;
+    }
+
+    const selection = window.getSelection();
+    const selectedText = selection.toString().trim();
+
+    // Only show popup if text is selected within PDF text layer
+    if (selectedText && selectedText.length > 0) {
+        const range = selection.getRangeAt(0);
+        const rect = range.getBoundingClientRect();
+
+        // Store selection info for creating highlights
+        currentSelection = {
+            text: selectedText,
+            range: range,
+            rect: rect
+        };
+
+        // Show popup near selection
+        showHighlightPopup(rect.right, rect.top);
+    } else {
+        hideHighlightPopup();
+    }
 }
 
 async function createHighlight(type, note = null) {
-    if (!currentSelection || !currentArticle) return;
+    if (!currentSelection) return;
+    if (!currentArticle && !currentPDF) return;
 
     try {
-        const readerBody = document.getElementById('reader-body');
-        const fullText = readerBody.textContent;
-        const range = currentSelection.range;
+        let highlightData;
+        let apiEndpoint;
 
-        // Calculate character offsets
-        const preRange = document.createRange();
-        preRange.selectNodeContents(readerBody);
-        preRange.setEnd(range.startContainer, range.startOffset);
-        const start = preRange.toString().length;
-        const end = start + currentSelection.text.length;
+        // Check if we're highlighting in a PDF or article
+        if (currentPDF) {
+            // PDF highlighting
+            const textLayerDiv = document.getElementById('pdf-text-layer');
+            const fullText = textLayerDiv.textContent;
+            const range = currentSelection.range;
 
-        // Get context (50 chars before and after)
-        const contextStart = Math.max(0, start - 50);
-        const contextEnd = Math.min(fullText.length, end + 50);
-        const context = fullText.substring(contextStart, contextEnd);
+            // Calculate character offsets within the current page
+            const preRange = document.createRange();
+            preRange.selectNodeContents(textLayerDiv);
+            preRange.setEnd(range.startContainer, range.startOffset);
+            const start = preRange.toString().length;
+            const end = start + currentSelection.text.length;
 
-        // Create highlight via API
-        const highlightData = {
-            article_id: currentArticle.id,
-            type: type,
-            text: currentSelection.text,
-            context: context,
-            position: { start, end },
-            color: '#fbbf24',
-            note: note,
-            tags: []
-        };
+            // Get context (50 chars before and after)
+            const contextStart = Math.max(0, start - 50);
+            const contextEnd = Math.min(fullText.length, end + 50);
+            const context = fullText.substring(contextStart, contextEnd);
 
-        const newHighlight = await apiRequest('/highlights', {
+            highlightData = {
+                article_id: currentPDF.id,  // Required by schema (represents PDF ID)
+                type: type,
+                text: currentSelection.text,
+                context: context,
+                position: {
+                    start,
+                    end,
+                    page: currentPage  // Include current PDF page number
+                },
+                color: '#fbbf24',
+                note: note,
+                tags: []
+            };
+
+            apiEndpoint = `/pdfs/${currentPDF.id}/highlights`;
+        } else {
+            // Article highlighting
+            const readerBody = document.getElementById('reader-body');
+            const fullText = readerBody.textContent;
+            const range = currentSelection.range;
+
+            // Calculate character offsets
+            const preRange = document.createRange();
+            preRange.selectNodeContents(readerBody);
+            preRange.setEnd(range.startContainer, range.startOffset);
+            const start = preRange.toString().length;
+            const end = start + currentSelection.text.length;
+
+            // Get context (50 chars before and after)
+            const contextStart = Math.max(0, start - 50);
+            const contextEnd = Math.min(fullText.length, end + 50);
+            const context = fullText.substring(contextStart, contextEnd);
+
+            highlightData = {
+                article_id: currentArticle.id,
+                type: type,
+                text: currentSelection.text,
+                context: context,
+                position: { start, end },
+                color: '#fbbf24',
+                note: note,
+                tags: []
+            };
+
+            apiEndpoint = '/highlights';
+        }
+
+        const newHighlight = await apiRequest(apiEndpoint, {
             method: 'POST',
             body: JSON.stringify(highlightData)
         });
@@ -646,7 +870,12 @@ async function createHighlight(type, note = null) {
         currentHighlights.push(newHighlight);
 
         // Apply highlight to DOM
-        applyHighlightToDOM(newHighlight);
+        if (currentArticle) {
+            applyHighlightToDOM(newHighlight);
+        } else if (currentPDF) {
+            // Re-apply all highlights to the current PDF page
+            applyPDFHighlights(currentPage);
+        }
 
         // Clear selection
         window.getSelection().removeAllRanges();
@@ -730,9 +959,12 @@ function showAnnotationModal(existingHighlight = null) {
     const modalHTML = `
         <div class="modal-overlay">
             <div class="modal-content">
-                <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-                    ${existingHighlight ? 'Edit Annotation' : 'Add Annotation'}
-                </h3>
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-xl font-semibold text-gray-900 dark:text-white">
+                        ${existingHighlight ? 'Edit Annotation' : 'Add Annotation'}
+                    </h3>
+                    <button id="close-modal" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-2xl leading-none transition" title="Close">×</button>
+                </div>
                 <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
                     "${currentSelection ? currentSelection.text : (existingHighlight ? existingHighlight.text : '')}"
                 </p>
@@ -760,7 +992,22 @@ function showAnnotationModal(existingHighlight = null) {
     // Focus textarea
     setTimeout(() => document.getElementById('annotation-text').focus(), 100);
 
-    // Handle buttons
+    // Close modal when clicking outside (on the overlay)
+    document.querySelector('.modal-overlay').addEventListener('click', (e) => {
+        if (e.target.classList.contains('modal-overlay')) {
+            modalContainer.classList.add('hidden');
+            hideHighlightPopup();
+        }
+    });
+
+    // Handle close button (X)
+    document.getElementById('close-modal').addEventListener('click', (e) => {
+        e.stopPropagation();
+        modalContainer.classList.add('hidden');
+        hideHighlightPopup();
+    });
+
+    // Handle cancel button
     document.getElementById('cancel-annotation').addEventListener('click', () => {
         modalContainer.classList.add('hidden');
         hideHighlightPopup();
@@ -854,5 +1101,428 @@ async function loadHighlights(articleId) {
         });
     } catch (error) {
         console.error('Failed to load highlights:', error);
+    }
+}
+
+// ==================== PDF FUNCTIONALITY ====================
+
+let currentPDF = null;
+let pdfDocument = null;
+let currentPage = 1;
+let totalPages = 0;
+let pdfScale = 1.5;
+
+// PDF Upload Handler
+document.getElementById('upload-pdf-btn').addEventListener('click', () => {
+    document.getElementById('pdf-file-input').click();
+});
+
+document.getElementById('pdf-file-input').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (file.type !== 'application/pdf') {
+        showToast('Please select a PDF file', 'error');
+        return;
+    }
+
+    if (file.size > 50 * 1024 * 1024) {
+        showToast('PDF file size must be less than 50MB', 'error');
+        return;
+    }
+
+    try {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('title', file.name.replace('.pdf', ''));
+        formData.append('tags', JSON.stringify([]));
+
+        const token = localStorage.getItem('token');
+        const response = await fetch('/api/pdfs', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            },
+            body: formData
+        });
+
+        if (!response.ok) throw new Error('Upload failed');
+
+        const pdf = await response.json();
+        showToast('PDF uploaded successfully', 'success');
+
+        // Refresh the list
+        await loadArticles();
+
+        // Reset file input
+        e.target.value = '';
+    } catch (error) {
+        showToast('Failed to upload PDF', 'error');
+        console.error(error);
+    }
+});
+
+// PDF Reader Controls
+document.getElementById('close-pdf-reader').addEventListener('click', closePDFReader);
+document.getElementById('pdf-prev-page').addEventListener('click', () => changePDFPage(-1));
+document.getElementById('pdf-next-page').addEventListener('click', () => changePDFPage(1));
+document.getElementById('pdf-zoom-in').addEventListener('click', () => changePDFZoom(0.1));
+document.getElementById('pdf-zoom-out').addEventListener('click', () => changePDFZoom(-0.1));
+document.getElementById('pdf-favorite-btn').addEventListener('click', togglePDFFavorite);
+document.getElementById('pdf-archive-btn').addEventListener('click', togglePDFArchive);
+document.getElementById('delete-pdf-btn').addEventListener('click', deletePDF);
+
+async function openPDF(pdfId) {
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`/api/pdfs/${pdfId}`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (!response.ok) throw new Error('Failed to load PDF');
+
+        currentPDF = await response.json();
+        currentHighlights = currentPDF.highlights || [];
+
+        // Update UI
+        document.getElementById('pdf-title').textContent = currentPDF.title;
+        document.getElementById('pdf-favorite-btn').textContent = currentPDF.is_favorite ? '⭐' : '☆';
+        document.getElementById('pdf-archive-btn').textContent = currentPDF.is_archived ? '📦' : '📋';
+
+        // Hide article sections, show PDF reader
+        document.getElementById('article-list-container').classList.add('hidden');
+        document.getElementById('article-reader').classList.add('hidden');
+        document.getElementById('pdf-reader').classList.remove('hidden');
+
+        // Initialize highlight system for PDF (if not already initialized)
+        initializeHighlightSystem();
+
+        // Initialize auto-hide controls
+        initPDFControlsAutoHide();
+
+        // Load the PDF file
+        await loadPDFFile(pdfId);
+    } catch (error) {
+        showToast('Failed to open PDF', 'error');
+        console.error(error);
+    }
+}
+
+async function loadPDFFile(pdfId) {
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`/api/pdfs/${pdfId}/file`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (!response.ok) throw new Error('Failed to load PDF file');
+
+        const blob = await response.blob();
+        const arrayBuffer = await blob.arrayBuffer();
+
+        // Load PDF with PDF.js
+        const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+        pdfDocument = await loadingTask.promise;
+        totalPages = pdfDocument.numPages;
+
+        currentPage = 1;
+        await renderPDFPage(currentPage);
+
+        updatePDFControls();
+    } catch (error) {
+        showToast('Failed to load PDF file', 'error');
+        console.error(error);
+    }
+}
+
+async function renderPDFPage(pageNum) {
+    if (!pdfDocument) return;
+
+    try {
+        const page = await pdfDocument.getPage(pageNum);
+        const canvas = document.getElementById('pdf-canvas');
+        const context = canvas.getContext('2d');
+
+        const viewport = page.getViewport({ scale: pdfScale });
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+
+        // Render PDF page
+        const renderContext = {
+            canvasContext: context,
+            viewport: viewport
+        };
+
+        await page.render(renderContext).promise;
+
+        // Render text layer for selection
+        await renderPDFTextLayer(page, viewport);
+
+    } catch (error) {
+        console.error('Failed to render PDF page:', error);
+    }
+}
+
+async function renderPDFTextLayer(page, viewport) {
+    const textLayerDiv = document.getElementById('pdf-text-layer');
+    textLayerDiv.innerHTML = '';
+
+    // Position text layer correctly
+    textLayerDiv.style.width = viewport.width + 'px';
+    textLayerDiv.style.height = viewport.height + 'px';
+
+    try {
+        const textContent = await page.getTextContent();
+
+        // Render each text item
+        textContent.items.forEach(item => {
+            const tx = pdfjsLib.Util.transform(viewport.transform, item.transform);
+            const fontSize = Math.sqrt((tx[2] * tx[2]) + (tx[3] * tx[3]));
+
+            const span = document.createElement('span');
+            span.textContent = item.str;
+            span.style.left = tx[4] + 'px';
+            span.style.top = (tx[5] - fontSize) + 'px';
+            span.style.fontSize = fontSize + 'px';
+            span.style.fontFamily = item.fontName;
+
+            textLayerDiv.appendChild(span);
+        });
+
+        // Add text selection handler for PDF highlighting
+        textLayerDiv.removeEventListener('mouseup', handlePDFTextSelection);
+        textLayerDiv.addEventListener('mouseup', handlePDFTextSelection);
+
+        // Apply existing highlights for this page
+        applyPDFHighlights(pageNum);
+    } catch (error) {
+        console.error('Failed to render text layer:', error);
+    }
+}
+
+function applyPDFHighlights(pageNum) {
+    if (!currentHighlights || currentHighlights.length === 0) return;
+
+    const textLayerDiv = document.getElementById('pdf-text-layer');
+    const fullText = textLayerDiv.textContent;
+
+    // Filter highlights for current page
+    const pageHighlights = currentHighlights.filter(h => h.position.page === pageNum);
+
+    pageHighlights.forEach(highlight => {
+        const { start, end } = highlight.position;
+
+        // Find the spans that contain the highlighted text
+        const spans = Array.from(textLayerDiv.querySelectorAll('span'));
+        let charCount = 0;
+
+        spans.forEach(span => {
+            const spanStart = charCount;
+            const spanEnd = charCount + span.textContent.length;
+
+            // Check if this span overlaps with the highlight range
+            if (spanEnd > start && spanStart < end) {
+                // Add highlight class based on type
+                if (highlight.type === 'annotation') {
+                    span.classList.add('annotated');
+                } else {
+                    span.classList.add('highlighted');
+                }
+
+                // Add click handler to show annotation
+                if (highlight.note) {
+                    span.style.cursor = 'pointer';
+                    span.title = highlight.note;
+                }
+            }
+
+            charCount += span.textContent.length;
+        });
+    });
+}
+
+function changePDFPage(delta) {
+    const newPage = currentPage + delta;
+    if (newPage >= 1 && newPage <= totalPages) {
+        currentPage = newPage;
+        renderPDFPage(currentPage);
+        updatePDFControls();
+    }
+}
+
+function changePDFZoom(delta) {
+    pdfScale = Math.max(0.5, Math.min(3.0, pdfScale + delta));
+    renderPDFPage(currentPage);
+    updatePDFControls();
+}
+
+function updatePDFControls() {
+    document.getElementById('pdf-page-info').textContent = `Page ${currentPage} of ${totalPages}`;
+    document.getElementById('pdf-zoom-level').textContent = `${Math.round(pdfScale * 100)}%`;
+
+    document.getElementById('pdf-prev-page').disabled = currentPage === 1;
+    document.getElementById('pdf-next-page').disabled = currentPage === totalPages;
+}
+
+function closePDFReader() {
+    document.getElementById('pdf-reader').classList.add('hidden');
+    document.getElementById('article-list-container').classList.remove('hidden');
+
+    // Cleanup PDF controls auto-hide
+    clearPDFControlsTimeout();
+    document.removeEventListener('mousemove', handlePDFMouseMove);
+    document.removeEventListener('mousedown', handlePDFMouseMove);
+
+    // Cleanup PDF document
+    if (pdfDocument) {
+        pdfDocument.destroy();
+        pdfDocument = null;
+    }
+    currentPDF = null;
+    currentPage = 1;
+    totalPages = 0;
+    pdfScale = 1.5;
+}
+
+// Auto-hide PDF controls
+let pdfControlsTimeout = null;
+let pdfControlsVisible = true;
+
+function showPDFControls() {
+    document.getElementById('pdf-header').classList.remove('hidden-controls');
+    document.getElementById('pdf-controls').classList.remove('hidden-controls');
+    pdfControlsVisible = true;
+}
+
+function hidePDFControls() {
+    document.getElementById('pdf-header').classList.add('hidden-controls');
+    document.getElementById('pdf-controls').classList.add('hidden-controls');
+    pdfControlsVisible = false;
+}
+
+function resetPDFControlsTimeout() {
+    clearPDFControlsTimeout();
+    showPDFControls();
+    pdfControlsTimeout = setTimeout(() => {
+        hidePDFControls();
+    }, 3000); // Hide after 3 seconds of inactivity
+}
+
+function clearPDFControlsTimeout() {
+    if (pdfControlsTimeout) {
+        clearTimeout(pdfControlsTimeout);
+        pdfControlsTimeout = null;
+    }
+}
+
+function handlePDFMouseMove() {
+    resetPDFControlsTimeout();
+}
+
+function initPDFControlsAutoHide() {
+    // Show controls on mouse movement or interaction
+    document.addEventListener('mousemove', handlePDFMouseMove);
+    document.addEventListener('mousedown', handlePDFMouseMove);
+
+    // Keep controls visible when hovering over them
+    const pdfHeader = document.getElementById('pdf-header');
+    const pdfControls = document.getElementById('pdf-controls');
+
+    pdfHeader.addEventListener('mouseenter', () => {
+        clearPDFControlsTimeout();
+        showPDFControls();
+    });
+
+    pdfControls.addEventListener('mouseenter', () => {
+        clearPDFControlsTimeout();
+        showPDFControls();
+    });
+
+    pdfHeader.addEventListener('mouseleave', resetPDFControlsTimeout);
+    pdfControls.addEventListener('mouseleave', resetPDFControlsTimeout);
+
+    // Start the auto-hide timer
+    resetPDFControlsTimeout();
+}
+
+async function togglePDFFavorite() {
+    if (!currentPDF) return;
+
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`/api/pdfs/${currentPDF.id}`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                is_favorite: !currentPDF.is_favorite
+            })
+        });
+
+        if (!response.ok) throw new Error('Failed to update PDF');
+
+        currentPDF.is_favorite = !currentPDF.is_favorite;
+        document.getElementById('pdf-favorite-btn').textContent = currentPDF.is_favorite ? '⭐' : '☆';
+        showToast(currentPDF.is_favorite ? 'Added to favorites' : 'Removed from favorites', 'success');
+    } catch (error) {
+        showToast('Failed to update favorite status', 'error');
+    }
+}
+
+async function togglePDFArchive() {
+    if (!currentPDF) return;
+
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`/api/pdfs/${currentPDF.id}`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                is_archived: !currentPDF.is_archived
+            })
+        });
+
+        if (!response.ok) throw new Error('Failed to update PDF');
+
+        currentPDF.is_archived = !currentPDF.is_archived;
+        document.getElementById('pdf-archive-btn').textContent = currentPDF.is_archived ? '📦' : '📋';
+        showToast(currentPDF.is_archived ? 'Archived' : 'Unarchived', 'success');
+    } catch (error) {
+        showToast('Failed to update archive status', 'error');
+    }
+}
+
+async function deletePDF() {
+    if (!currentPDF) return;
+
+    if (!confirm('Are you sure you want to delete this PDF? This action cannot be undone.')) {
+        return;
+    }
+
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`/api/pdfs/${currentPDF.id}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (!response.ok) throw new Error('Failed to delete PDF');
+
+        showToast('PDF deleted', 'success');
+        closePDFReader();
+        await loadArticles();
+    } catch (error) {
+        showToast('Failed to delete PDF', 'error');
     }
 }

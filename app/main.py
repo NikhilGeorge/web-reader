@@ -3,7 +3,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
-from app.routes import auth, articles, tags, highlights
+from app.routes import auth, articles, tags, highlights, pdfs
 from app.storage import storage
 import os
 
@@ -31,6 +31,7 @@ app.include_router(auth.router, prefix="/api")
 app.include_router(articles.router, prefix="/api")
 app.include_router(tags.router, prefix="/api")
 app.include_router(highlights.router, prefix="/api")
+app.include_router(pdfs.router, prefix="/api")
 
 # Serve static files
 static_dir = os.path.join(os.path.dirname(__file__), "..", "static")

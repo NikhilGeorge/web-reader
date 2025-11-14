@@ -23,8 +23,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY app/ ./app/
 COPY static/ ./static/
+COPY .env.example .env
 
-# Create data directory for SQLite database
+# Create data directory for file-based storage
 RUN mkdir -p /app/data
 
 # Expose port
@@ -32,11 +33,11 @@ EXPOSE 8000
 
 # Environment variables
 ENV PYTHONUNBUFFERED=1
-ENV DATABASE_URL=sqlite:///./data/webreader.db
+ENV DATA_PATH=/app/data
 
-# Health check
+# Health check (checks if the app is responding)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:8000/api/health')"
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/auth/config')"
 
 # Run the application
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

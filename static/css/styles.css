@@ -325,6 +325,9 @@ body {
     flex: 1;
     overflow-y: auto;
     background: var(--bg-primary);
+    width: 100%;
+    display: flex;
+    flex-direction: column;
 }
 
 .reader-header {
@@ -334,6 +337,7 @@ body {
     padding: 1.5rem 2rem;
     border-bottom: 1px solid var(--border-color);
     background: var(--bg-secondary);
+    width: 100%;
 }
 
 .reader-actions {
@@ -345,6 +349,8 @@ body {
     max-width: 800px;
     margin: 0 auto;
     padding: 3rem 2rem;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 #reader-title {
@@ -371,10 +377,13 @@ body {
     font-size: 1.1rem;
     line-height: 1.8;
     color: var(--text-primary);
+    text-align: left;
+    direction: ltr;
 }
 
 .reader-body p {
     margin-bottom: 1.5rem;
+    text-align: left;
 }
 
 /* Buttons */

@@ -1,25 +1,23 @@
 from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
-from passlib.context import CryptContext
+import bcrypt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from sqlalchemy.orm import Session
 from app.config import settings
-from app.database import get_db
-from app.models import User
 from app.schemas import TokenData
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
 
 
 def get_password_hash(password: str) -> str:
-    return pwd_context.hash(password)
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(password.encode('utf-8'), salt)
+    return hashed.decode('utf-8')
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
@@ -33,7 +31,22 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     return encoded_jwt
 
 
-def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
+def get_current_user(token: str = Depends(oauth2_scheme)):
+    from app.storage import storage
+
+    # If auth is disabled, return a default user
+    if settings.disable_auth:
+        # Ensure default user exists
+        user = storage.get_user_by_username(settings.default_user)
+        if not user:
+            # Create default user
+            user = storage.create_user(
+                email=f"{settings.default_user}@example.com",
+                username=settings.default_user,
+                hashed_password=get_password_hash("password")
+            )
+        return user
+
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -48,7 +61,7 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     except JWTError:
         raise credentials_exception
 
-    user = db.query(User).filter(User.username == token_data.username).first()
+    user = storage.get_user_by_username(token_data.username)
     if user is None:
         raise credentials_exception
     return user

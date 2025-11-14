@@ -4,6 +4,7 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 from typing import Optional, Dict
 import logging
+import re
 from urllib.parse import urlparse
 
 logging.basicConfig(level=logging.INFO)
@@ -22,16 +23,34 @@ class ArticleParser:
             response = requests.get(url, headers=self.headers, timeout=10)
             response.raise_for_status()
 
-            # Parse with readability
-            doc = Document(response.content)
-            soup = BeautifulSoup(doc.summary(), 'html.parser')
-            full_soup = BeautifulSoup(response.content, 'html.parser')
+            # Parse with readability (use .text instead of .content to avoid bytes issue)
+            doc = Document(response.text)
 
-            # Extract text content
-            content = soup.get_text(separator='\n', strip=True)
+            # Get the cleaned HTML content
+            html_content = doc.summary()
+            soup = BeautifulSoup(html_content, 'html.parser')
+            full_soup = BeautifulSoup(response.text, 'html.parser')
 
-            # Create excerpt
-            excerpt = content[:300] + '...' if len(content) > 300 else content
+            # Remove unwanted elements (references, navigation, etc)
+            for unwanted in soup.find_all(['sup', 'script', 'style', 'nav', 'footer']):
+                unwanted.decompose()
+
+            # Clean up the HTML - keep structure but sanitize
+            # Make all links open in new tab
+            for link in soup.find_all('a'):
+                link['target'] = '_blank'
+                link['rel'] = 'noopener noreferrer'
+
+            # Get the cleaned HTML as string
+            content = str(soup)
+
+            # Clean up excessive whitespace in HTML
+            content = re.sub(r'\n\s*\n', '\n', content)
+            content = re.sub(r'>\s+<', '><', content)
+
+            # Create text-only excerpt from the content
+            excerpt_text = soup.get_text(separator=' ', strip=True)
+            excerpt = excerpt_text[:300] + '...' if len(excerpt_text) > 300 else excerpt_text
 
             # Try to extract author from meta tags
             author = self._extract_author(full_soup)

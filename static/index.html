@@ -4,120 +4,427 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Web Reader</title>
-    <link rel="stylesheet" href="/static/css/styles.css">
-</head>
-<body>
-    <!-- Auth Section (Login/Register) -->
-    <div id="auth-section" class="auth-container">
-        <div class="auth-box">
-            <h1 class="logo">📚 Web Reader</h1>
-            <p class="tagline">Your personal read-it-later app</p>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            200: '#bfdbfe',
+                            300: '#93c5fd',
+                            400: '#60a5fa',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            800: '#1e40af',
+                            900: '#1e3a8a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .nav-item { @apply text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white; }
+        .nav-item.active { @apply bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-300; }
 
-            <div id="login-form" class="form-container">
-                <h2>Login</h2>
-                <form id="login-form-element">
-                    <input type="text" id="login-username" placeholder="Username" required>
-                    <input type="password" id="login-password" placeholder="Password" required>
-                    <button type="submit" class="btn btn-primary">Login</button>
+        /* Article content styling */
+        #reader-body {
+            line-height: 1.8;
+        }
+        #reader-body h1, #reader-body h2, #reader-body h3, #reader-body h4, #reader-body h5, #reader-body h6 {
+            font-weight: 700;
+            margin-top: 2rem;
+            margin-bottom: 1rem;
+            line-height: 1.3;
+            color: #111827;
+        }
+        .dark #reader-body h1, .dark #reader-body h2, .dark #reader-body h3, .dark #reader-body h4, .dark #reader-body h5, .dark #reader-body h6 {
+            color: #f9fafb;
+        }
+        #reader-body h1 { font-size: 2rem; }
+        #reader-body h2 { font-size: 1.75rem; }
+        #reader-body h3 { font-size: 1.5rem; }
+        #reader-body h4 { font-size: 1.25rem; }
+        #reader-body h5 { font-size: 1.125rem; }
+        #reader-body h6 { font-size: 1rem; }
+
+        #reader-body p {
+            margin-bottom: 1.5rem;
+        }
+
+        #reader-body a {
+            color: #2563eb;
+            text-decoration: underline;
+            text-decoration-color: rgba(37, 99, 235, 0.3);
+            text-underline-offset: 2px;
+            transition: all 0.2s;
+        }
+        #reader-body a:hover {
+            text-decoration-color: #2563eb;
+        }
+        .dark #reader-body a {
+            color: #60a5fa;
+            text-decoration-color: rgba(96, 165, 250, 0.3);
+        }
+        .dark #reader-body a:hover {
+            text-decoration-color: #60a5fa;
+        }
+
+        #reader-body ul, #reader-body ol {
+            margin-left: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        #reader-body ul {
+            list-style-type: disc;
+        }
+        #reader-body ol {
+            list-style-type: decimal;
+        }
+        #reader-body li {
+            margin-bottom: 0.5rem;
+            padding-left: 0.5rem;
+        }
+
+        #reader-body blockquote {
+            border-left: 4px solid #3b82f6;
+            padding-left: 1.5rem;
+            margin: 1.5rem 0;
+            font-style: italic;
+            color: #4b5563;
+        }
+        .dark #reader-body blockquote {
+            border-left-color: #60a5fa;
+            color: #9ca3af;
+        }
+
+        #reader-body code {
+            background: #f3f4f6;
+            padding: 0.125rem 0.375rem;
+            border-radius: 0.25rem;
+            font-size: 0.875em;
+            font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+        }
+        .dark #reader-body code {
+            background: #374151;
+        }
+
+        #reader-body pre {
+            background: #f3f4f6;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            overflow-x: auto;
+            margin-bottom: 1.5rem;
+        }
+        .dark #reader-body pre {
+            background: #374151;
+        }
+        #reader-body pre code {
+            background: transparent;
+            padding: 0;
+        }
+
+        #reader-body img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 0.5rem;
+            margin: 1.5rem 0;
+        }
+
+        #reader-body table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 1.5rem;
+        }
+        #reader-body th, #reader-body td {
+            border: 1px solid #e5e7eb;
+            padding: 0.75rem;
+            text-align: left;
+        }
+        .dark #reader-body th, .dark #reader-body td {
+            border-color: #4b5563;
+        }
+        #reader-body th {
+            background: #f9fafb;
+            font-weight: 600;
+        }
+        .dark #reader-body th {
+            background: #374151;
+        }
+
+        #reader-body hr {
+            border: none;
+            border-top: 1px solid #e5e7eb;
+            margin: 2rem 0;
+        }
+        .dark #reader-body hr {
+            border-top-color: #4b5563;
+        }
+
+        #reader-body strong, #reader-body b {
+            font-weight: 600;
+        }
+
+        #reader-body em, #reader-body i {
+            font-style: italic;
+        }
+
+        /* Highlight styles */
+        .highlight {
+            background-color: #fef3c7;
+            border-radius: 2px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .dark .highlight {
+            background-color: #78350f;
+        }
+        .highlight:hover {
+            background-color: #fde68a;
+        }
+        .dark .highlight:hover {
+            background-color: #92400e;
+        }
+
+        /* Highlight popup */
+        #highlight-popup {
+            position: absolute;
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            padding: 8px;
+            display: flex;
+            gap: 4px;
+            z-index: 1000;
+        }
+        .dark #highlight-popup {
+            background: #1f2937;
+            border-color: #374151;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+        }
+        #highlight-popup button {
+            padding: 8px 12px;
+            border-radius: 6px;
+            background: #f3f4f6;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            font-size: 14px;
+            font-weight: 500;
+            color: #374151;
+        }
+        .dark #highlight-popup button {
+            background: #374151;
+            color: #d1d5db;
+        }
+        #highlight-popup button:hover {
+            background: #e5e7eb;
+        }
+        .dark #highlight-popup button:hover {
+            background: #4b5563;
+        }
+
+        /* Annotation modal */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        .dark .modal-content {
+            background: #1f2937;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 transition-colors">
+    <!-- Auth Section (Login/Register) -->
+    <div id="auth-section" class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-500 to-purple-600 p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md p-8">
+            <div class="text-center mb-8">
+                <h1 class="text-4xl font-bold mb-2">📚 Web Reader</h1>
+                <p class="text-gray-600 dark:text-gray-400">Your personal read-it-later app</p>
+            </div>
+
+            <!-- Login Form -->
+            <div id="login-form">
+                <h2 class="text-2xl font-semibold mb-6 text-gray-800 dark:text-white">Login</h2>
+                <form id="login-form-element" class="space-y-4">
+                    <input type="text" id="login-username" placeholder="Username" required
+                        class="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition">
+                    <input type="password" id="login-password" placeholder="Password" required
+                        class="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition">
+                    <button type="submit" class="w-full bg-primary-600 hover:bg-primary-700 text-white font-semibold py-3 rounded-lg transition transform hover:scale-[1.02] active:scale-[0.98]">
+                        Login
+                    </button>
                 </form>
-                <p class="form-switch">
-                    Don't have an account? <a href="#" id="show-register">Register</a>
+                <p class="text-center mt-4 text-gray-600 dark:text-gray-400">
+                    Don't have an account? <a href="#" id="show-register" class="text-primary-600 dark:text-primary-400 font-semibold hover:underline">Register</a>
                 </p>
             </div>
 
-            <div id="register-form" class="form-container" style="display: none;">
-                <h2>Register</h2>
-                <form id="register-form-element">
-                    <input type="email" id="register-email" placeholder="Email" required>
-                    <input type="text" id="register-username" placeholder="Username" required>
-                    <input type="password" id="register-password" placeholder="Password" required>
-                    <button type="submit" class="btn btn-primary">Register</button>
+            <!-- Register Form -->
+            <div id="register-form" class="hidden">
+                <h2 class="text-2xl font-semibold mb-6 text-gray-800 dark:text-white">Register</h2>
+                <form id="register-form-element" class="space-y-4">
+                    <input type="email" id="register-email" placeholder="Email" required
+                        class="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition">
+                    <input type="text" id="register-username" placeholder="Username" required
+                        class="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition">
+                    <input type="password" id="register-password" placeholder="Password" required
+                        class="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition">
+                    <button type="submit" class="w-full bg-primary-600 hover:bg-primary-700 text-white font-semibold py-3 rounded-lg transition transform hover:scale-[1.02] active:scale-[0.98]">
+                        Register
+                    </button>
                 </form>
-                <p class="form-switch">
-                    Already have an account? <a href="#" id="show-login">Login</a>
+                <p class="text-center mt-4 text-gray-600 dark:text-gray-400">
+                    Already have an account? <a href="#" id="show-login" class="text-primary-600 dark:text-primary-400 font-semibold hover:underline">Login</a>
                 </p>
             </div>
         </div>
     </div>
 
     <!-- Main App Section -->
-    <div id="app-section" style="display: none;">
+    <div id="app-section" class="hidden min-h-screen flex flex-col">
         <!-- Header -->
-        <header class="app-header">
-            <div class="header-left">
-                <h1 class="app-logo">📚 Web Reader</h1>
-            </div>
-            <div class="header-center">
-                <div class="add-article-form">
-                    <input type="url" id="new-article-url" placeholder="Paste URL to save article...">
-                    <button id="add-article-btn" class="btn btn-primary">Save</button>
+        <header class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50">
+            <div class="px-6 py-4 flex items-center justify-between gap-4">
+                <div class="flex items-center">
+                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white whitespace-nowrap">📚 Web Reader</h1>
                 </div>
-            </div>
-            <div class="header-right">
-                <button id="theme-toggle" class="btn btn-icon" title="Toggle theme">🌙</button>
-                <span id="user-name" class="user-name"></span>
-                <button id="logout-btn" class="btn btn-secondary">Logout</button>
+                <div class="flex-1 max-w-2xl">
+                    <div class="flex gap-2">
+                        <input type="url" id="new-article-url" placeholder="Paste URL to save article..."
+                            class="flex-1 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition">
+                        <button id="add-article-btn" class="bg-primary-600 hover:bg-primary-700 text-white font-semibold px-6 py-2 rounded-lg transition whitespace-nowrap">
+                            Save
+                        </button>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <button id="theme-toggle" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition" title="Toggle theme">
+                        🌙
+                    </button>
+                    <span id="user-name" class="text-gray-700 dark:text-gray-300 font-medium hidden md:inline"></span>
+                    <button id="logout-btn" class="bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-white px-4 py-2 rounded-lg transition font-medium whitespace-nowrap">
+                        Logout
+                    </button>
+                </div>
             </div>
         </header>
 
         <!-- Main Content -->
-        <div class="main-container">
+        <div class="flex flex-1 overflow-hidden">
             <!-- Sidebar -->
-            <aside class="sidebar">
-                <div class="sidebar-section">
-                    <h3>Library</h3>
-                    <nav class="sidebar-nav">
-                        <a href="#" class="nav-item active" data-filter="all">All Articles</a>
-                        <a href="#" class="nav-item" data-filter="favorite">Favorites</a>
-                        <a href="#" class="nav-item" data-filter="archived">Archive</a>
-                    </nav>
-                </div>
-
-                <div class="sidebar-section">
-                    <div class="section-header">
-                        <h3>Tags</h3>
-                        <button id="add-tag-btn" class="btn btn-icon-small" title="Add tag">+</button>
+            <aside id="sidebar" class="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 overflow-y-auto flex-shrink-0">
+                <div class="p-6 space-y-6">
+                    <!-- Library -->
+                    <div>
+                        <h3 class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">Library</h3>
+                        <nav class="space-y-1">
+                            <a href="#" class="nav-item active flex items-center px-3 py-2 text-sm font-medium rounded-lg transition" data-filter="all">
+                                <span class="mr-3">📄</span> All Articles
+                            </a>
+                            <a href="#" class="nav-item flex items-center px-3 py-2 text-sm font-medium rounded-lg transition" data-filter="favorite">
+                                <span class="mr-3">⭐</span> Favorites
+                            </a>
+                            <a href="#" class="nav-item flex items-center px-3 py-2 text-sm font-medium rounded-lg transition" data-filter="archived">
+                                <span class="mr-3">📦</span> Archive
+                            </a>
+                        </nav>
                     </div>
-                    <div id="tags-list" class="tags-list"></div>
-                </div>
 
-                <div class="sidebar-section">
-                    <input type="text" id="search-input" placeholder="Search articles..." class="search-input">
+                    <!-- Tags -->
+                    <div>
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Tags</h3>
+                            <button id="add-tag-btn" class="text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-bold text-lg" title="Add tag">+</button>
+                        </div>
+                        <div id="tags-list" class="space-y-1"></div>
+                    </div>
+
+                    <!-- Search -->
+                    <div>
+                        <input type="text" id="search-input" placeholder="Search articles..."
+                            class="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition">
+                    </div>
                 </div>
             </aside>
 
             <!-- Article List -->
-            <main class="content-area">
-                <div id="article-list" class="article-list"></div>
+            <main id="article-list-container" class="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900">
+                <div id="article-list" class="p-6 grid gap-4 grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3"></div>
             </main>
 
             <!-- Article Reader -->
-            <div id="article-reader" class="article-reader" style="display: none;">
-                <div class="reader-header">
-                    <button id="close-reader" class="btn btn-secondary">← Back to List</button>
-                    <div class="reader-actions">
-                        <button id="favorite-btn" class="btn btn-icon" title="Favorite">⭐</button>
-                        <button id="archive-btn" class="btn btn-icon" title="Archive">📦</button>
-                        <button id="delete-article-btn" class="btn btn-icon" title="Delete">🗑️</button>
+            <div id="article-reader" class="hidden flex-1 overflow-y-auto bg-white dark:bg-gray-900">
+                <div class="max-w-4xl mx-auto w-full">
+                    <!-- Reader Header -->
+                    <div class="sticky top-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center justify-between z-10">
+                        <button id="close-reader" class="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition font-medium">
+                            <span>←</span>
+                            <span>Back to List</span>
+                        </button>
+                        <div class="flex items-center gap-2">
+                            <button id="favorite-btn" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition text-xl" title="Favorite">⭐</button>
+                            <button id="archive-btn" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition text-xl" title="Archive">📦</button>
+                            <button id="delete-article-btn" class="p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 transition text-xl" title="Delete">🗑️</button>
+                        </div>
                     </div>
+
+                    <!-- Reader Content -->
+                    <article class="px-6 py-12 max-w-3xl mx-auto">
+                        <h1 id="reader-title" class="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-4 leading-tight"></h1>
+                        <div class="flex flex-wrap items-center gap-3 text-sm text-gray-600 dark:text-gray-400 mb-4">
+                            <span id="reader-author"></span>
+                        </div>
+                        <div id="reader-tags" class="flex flex-wrap gap-2 mb-8"></div>
+                        <div id="reader-body" class="text-lg leading-relaxed text-gray-800 dark:text-gray-200 space-y-4"></div>
+                    </article>
                 </div>
-                <article class="reader-content">
-                    <h1 id="reader-title"></h1>
-                    <div class="reader-meta">
-                        <span id="reader-author"></span>
-                        <span id="reader-date"></span>
-                        <span id="reader-site"></span>
-                    </div>
-                    <div id="reader-tags" class="reader-tags"></div>
-                    <div id="reader-body" class="reader-body"></div>
-                </article>
             </div>
         </div>
     </div>
 
-    <!-- Toast Notifications -->
-    <div id="toast-container" class="toast-container"></div>
+    <!-- Toast Container -->
+    <div id="toast-container" class="fixed bottom-4 right-4 z-50 space-y-2 max-w-sm"></div>
 
-    <script src="/static/js/app.js"></script>
+    <!-- Highlight Popup -->
+    <div id="highlight-popup" class="hidden">
+        <button id="highlight-btn" title="Highlight">
+            <svg class="w-4 h-4 inline" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"></path>
+            </svg>
+            Highlight
+        </button>
+        <button id="annotate-btn" title="Annotate">
+            <svg class="w-4 h-4 inline" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clip-rule="evenodd"></path>
+            </svg>
+            Annotate
+        </button>
+    </div>
+
+    <!-- Annotation Modal (hidden by default, will be created dynamically) -->
+    <div id="annotation-modal" class="hidden"></div>
+
+    <script src="/static/js/app.js?v=13"></script>
 </body>
 </html>

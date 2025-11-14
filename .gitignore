@@ -58,3 +58,6 @@ htmlcov/
 # Node (if frontend build tools are added)
 node_modules/
 npm-debug.log
+
+# custom for this app
+data/

@@ -3,12 +3,12 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
-from app.database import engine, Base
 from app.routes import auth, articles, tags, highlights
+from app.storage import storage
 import os
 
-# Create database tables
-Base.metadata.create_all(bind=engine)
+# Initialize storage
+storage._init_storage()
 
 # Initialize FastAPI app
 app = FastAPI(

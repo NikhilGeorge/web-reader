@@ -11,37 +11,15 @@ let searchQuery = '';
 let currentArticle = null;
 
 // Initialize app
-document.addEventListener('DOMContentLoaded', () => {
-    // Check if user is logged in
-    const token = localStorage.getItem('token');
-    if (token) {
-        fetchCurrentUser();
-    }
-
-    // Auth event listeners
-    document.getElementById('show-register').addEventListener('click', (e) => {
-        e.preventDefault();
-        document.getElementById('login-form').style.display = 'none';
-        document.getElementById('register-form').style.display = 'block';
-    });
-
-    document.getElementById('show-login').addEventListener('click', (e) => {
-        e.preventDefault();
-        document.getElementById('register-form').style.display = 'none';
-        document.getElementById('login-form').style.display = 'block';
-    });
-
-    document.getElementById('login-form-element').addEventListener('submit', handleLogin);
-    document.getElementById('register-form-element').addEventListener('submit', handleRegister);
-
-    // App event listeners
+document.addEventListener('DOMContentLoaded', async () => {
+    // Setup app event listeners (always needed)
     document.getElementById('logout-btn').addEventListener('click', handleLogout);
     document.getElementById('add-article-btn').addEventListener('click', handleAddArticle);
     document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
     document.getElementById('close-reader').addEventListener('click', closeReader);
     document.getElementById('search-input').addEventListener('input', handleSearch);
 
-    // Filter navigation
+    // Filter navigation (always needed)
     document.querySelectorAll('.nav-item').forEach(item => {
         item.addEventListener('click', (e) => {
             e.preventDefault();
@@ -55,9 +33,49 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Load theme preference
     if (localStorage.getItem('theme') === 'dark') {
-        document.documentElement.setAttribute('data-theme', 'dark');
+        document.documentElement.classList.add('dark');
         document.getElementById('theme-toggle').textContent = '☀️';
     }
+
+    // Check auth configuration first
+    try {
+        const authConfig = await fetch('/api/auth/config').then(r => r.json());
+
+        if (!authConfig.auth_enabled) {
+            // Auth is disabled, auto-login
+            const response = await fetch('/api/auth/auto-login');
+            if (response.ok) {
+                const data = await response.json();
+                localStorage.setItem('token', data.access_token);
+                await fetchCurrentUser();
+                return; // Skip setting up login form listeners
+            }
+        }
+    } catch (error) {
+        console.log('Auth config check failed, proceeding with normal auth');
+    }
+
+    // Check if user is logged in
+    const token = localStorage.getItem('token');
+    if (token) {
+        fetchCurrentUser();
+    }
+
+    // Auth event listeners (only needed if showing login form)
+    document.getElementById('show-register').addEventListener('click', (e) => {
+        e.preventDefault();
+        document.getElementById('login-form').classList.add('hidden');
+        document.getElementById('register-form').classList.remove('hidden');
+    });
+
+    document.getElementById('show-login').addEventListener('click', (e) => {
+        e.preventDefault();
+        document.getElementById('register-form').classList.add('hidden');
+        document.getElementById('login-form').classList.remove('hidden');
+    });
+
+    document.getElementById('login-form-element').addEventListener('submit', handleLogin);
+    document.getElementById('register-form-element').addEventListener('submit', handleRegister);
 });
 
 // Authentication
@@ -141,13 +159,13 @@ function handleLogout() {
 }
 
 function showAuth() {
-    document.getElementById('auth-section').style.display = 'flex';
-    document.getElementById('app-section').style.display = 'none';
+    document.getElementById('auth-section').classList.remove('hidden');
+    document.getElementById('app-section').classList.add('hidden');
 }
 
 function showApp() {
-    document.getElementById('auth-section').style.display = 'none';
-    document.getElementById('app-section').style.display = 'block';
+    document.getElementById('auth-section').classList.add('hidden');
+    document.getElementById('app-section').classList.remove('hidden');
     document.getElementById('user-name').textContent = currentUser.username;
 }
 
@@ -184,17 +202,17 @@ function renderArticles() {
     container.innerHTML = '';
 
     if (articles.length === 0) {
-        container.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">No articles found. Add one to get started!</p>';
+        container.innerHTML = '<div class="col-span-full text-center py-12 text-gray-500 dark:text-gray-400">No articles found. Add one to get started!</div>';
         return;
     }
 
     articles.forEach(article => {
         const card = document.createElement('div');
-        card.className = 'article-card';
+        card.className = 'bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5 hover:shadow-lg dark:hover:shadow-gray-900/50 transition cursor-pointer';
         card.onclick = () => openArticle(article.id);
 
         const tagsHtml = article.tags.map(tag =>
-            `<span class="tag-badge" style="background: ${tag.color}20; color: ${tag.color}">${tag.name}</span>`
+            `<span class="inline-block px-2 py-1 text-xs font-medium rounded" style="background: ${tag.color}20; color: ${tag.color}">${tag.name}</span>`
         ).join('');
 
         const date = new Date(article.created_at).toLocaleDateString();
@@ -202,22 +220,22 @@ function renderArticles() {
         const archiveIcon = article.is_archived ? '📦' : '';
 
         card.innerHTML = `
-            <div class="article-header">
-                <div>
-                    <h3 class="article-title">${article.title || 'Untitled'}</h3>
-                    <div class="article-meta">
+            <div class="flex justify-between items-start mb-3">
+                <div class="flex-1">
+                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2 line-clamp-2">${article.title || 'Untitled'}</h3>
+                    <div class="flex flex-wrap items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                         ${article.site_name ? `<span>${article.site_name}</span>` : ''}
-                        ${article.author ? `<span>by ${article.author}</span>` : ''}
-                        <span>${date}</span>
+                        ${article.author ? `<span class="before:content-['•'] before:mx-2">by ${article.author}</span>` : ''}
+                        <span class="before:content-['•'] before:mx-2">${date}</span>
                     </div>
                 </div>
-                <div class="article-icons">
+                <div class="flex gap-1 text-lg">
                     ${favoriteIcon} ${archiveIcon}
                 </div>
             </div>
-            ${article.excerpt ? `<p class="article-excerpt">${article.excerpt}</p>` : ''}
-            <div class="article-footer">
-                <div class="article-tags">${tagsHtml}</div>
+            ${article.excerpt ? `<p class="text-gray-600 dark:text-gray-300 text-sm line-clamp-3 mb-3">${article.excerpt}</p>` : ''}
+            <div class="flex flex-wrap gap-2 mt-3">
+                ${tagsHtml}
             </div>
         `;
 
@@ -244,7 +262,8 @@ async function handleAddArticle() {
         loadArticles();
         showToast('Article saved successfully!', 'success');
     } catch (error) {
-        showToast('Failed to save article', 'error');
+        console.error('Failed to save article:', error);
+        showToast(`Failed to save article: ${error.message}`, 'error');
     }
 }
 
@@ -252,17 +271,32 @@ async function openArticle(articleId) {
     try {
         currentArticle = await apiRequest(`/articles/${articleId}`);
         renderArticleReader();
-        document.getElementById('article-list').style.display = 'none';
-        document.getElementById('article-reader').style.display = 'block';
+        // Hide sidebar and article list, show reader
+        document.getElementById('sidebar').classList.add('hidden');
+        document.getElementById('article-list-container').classList.add('hidden');
+        document.getElementById('article-reader').classList.remove('hidden');
     } catch (error) {
         showToast('Failed to load article', 'error');
     }
 }
 
 function closeReader() {
-    document.getElementById('article-reader').style.display = 'none';
-    document.getElementById('article-list').style.display = 'block';
+    // Show sidebar and article list, hide reader
+    document.getElementById('sidebar').classList.remove('hidden');
+    document.getElementById('article-list-container').classList.remove('hidden');
+    document.getElementById('article-reader').classList.add('hidden');
+
+    // Hide highlight popup and annotation modal
+    hideHighlightPopup();
+    const annotationModal = document.getElementById('annotation-modal');
+    if (annotationModal) {
+        annotationModal.classList.add('hidden');
+        annotationModal.innerHTML = '';
+    }
+
     currentArticle = null;
+    currentSelection = null;
+    currentHighlights = [];
     loadArticles();
 }
 
@@ -279,12 +313,16 @@ function renderArticleReader() {
     document.getElementById('reader-author').textContent = metaParts.join(' • ');
 
     const tagsHtml = currentArticle.tags.map(tag =>
-        `<span class="tag-badge" style="background: ${tag.color}20; color: ${tag.color}">${tag.name}</span>`
+        `<span class="inline-block px-3 py-1 text-sm font-medium rounded-full" style="background: ${tag.color}20; color: ${tag.color}">${tag.name}</span>`
     ).join('');
     document.getElementById('reader-tags').innerHTML = tagsHtml;
 
-    const content = currentArticle.content || 'No content available';
-    document.getElementById('reader-body').innerHTML = content.split('\n').map(p => `<p>${p}</p>`).join('');
+    const content = currentArticle.content || '<p class="text-gray-600 dark:text-gray-400">No content available</p>';
+    document.getElementById('reader-body').innerHTML = content;
+
+    // Initialize highlight system and load highlights after content is rendered
+    initializeHighlightSystem();
+    loadHighlights(currentArticle.id);
 
     // Set up action buttons
     const favoriteBtn = document.getElementById('favorite-btn');
@@ -407,13 +445,17 @@ function handleSearch(e) {
 
 // Theme
 function toggleTheme() {
-    const currentTheme = document.documentElement.getAttribute('data-theme');
-    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    const isDark = document.documentElement.classList.contains('dark');
 
-    document.documentElement.setAttribute('data-theme', newTheme);
-    localStorage.setItem('theme', newTheme);
-
-    document.getElementById('theme-toggle').textContent = newTheme === 'dark' ? '☀️' : '🌙';
+    if (isDark) {
+        document.documentElement.classList.remove('dark');
+        localStorage.setItem('theme', 'light');
+        document.getElementById('theme-toggle').textContent = '🌙';
+    } else {
+        document.documentElement.classList.add('dark');
+        localStorage.setItem('theme', 'dark');
+        document.getElementById('theme-toggle').textContent = '☀️';
+    }
 }
 
 // Utilities
@@ -446,12 +488,371 @@ async function apiRequest(endpoint, options = {}) {
 function showToast(message, type = 'success') {
     const container = document.getElementById('toast-container');
     const toast = document.createElement('div');
-    toast.className = `toast ${type}`;
+
+    const bgColor = type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500';
+    toast.className = `${bgColor} text-white px-6 py-3 rounded-lg shadow-lg transform transition-all duration-300 opacity-0 translate-y-2`;
     toast.textContent = message;
 
     container.appendChild(toast);
 
+    // Trigger animation
     setTimeout(() => {
-        toast.remove();
+        toast.classList.remove('opacity-0', 'translate-y-2');
+    }, 10);
+
+    // Remove after 3 seconds
+    setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 300);
     }, 3000);
+}
+
+// Highlights and Annotations
+let currentSelection = null;
+let currentHighlights = [];
+let highlightSystemInitialized = false;
+
+function initializeHighlightSystem() {
+    if (highlightSystemInitialized) return;
+
+    const readerBody = document.getElementById('reader-body');
+    const popup = document.getElementById('highlight-popup');
+
+    if (!readerBody || !popup) {
+        console.error('Reader body or popup not found');
+        return;
+    }
+
+    // Handle text selection
+    readerBody.addEventListener('mouseup', handleTextSelection);
+
+    // Handle highlight popup buttons
+    document.getElementById('highlight-btn').addEventListener('click', () => {
+        createHighlight('highlight');
+        hideHighlightPopup();
+    });
+
+    document.getElementById('annotate-btn').addEventListener('click', () => {
+        showAnnotationModal();
+    });
+
+    // Hide popup when clicking elsewhere
+    document.addEventListener('mousedown', (e) => {
+        if (!popup.contains(e.target) && !e.target.closest('#annotation-modal')) {
+            hideHighlightPopup();
+        }
+    });
+
+    highlightSystemInitialized = true;
+    console.log('Highlight system initialized');
+}
+
+function handleTextSelection(e) {
+    const selection = window.getSelection();
+    const selectedText = selection.toString().trim();
+
+    // Only show popup if text is selected and within reader body
+    if (selectedText && selectedText.length > 0) {
+        const range = selection.getRangeAt(0);
+        const readerBody = document.getElementById('reader-body');
+
+        // Check if selection is within reader body
+        if (!readerBody.contains(range.commonAncestorContainer)) {
+            return;
+        }
+
+        // Store selection data
+        currentSelection = {
+            text: selectedText,
+            range: range.cloneRange()
+        };
+
+        showHighlightPopup(e.clientX, e.clientY);
+    } else {
+        hideHighlightPopup();
+    }
+}
+
+function showHighlightPopup(x, y) {
+    const popup = document.getElementById('highlight-popup');
+    popup.classList.remove('hidden');
+
+    // Account for page scroll
+    const scrollY = window.pageYOffset || document.documentElement.scrollTop;
+    const scrollX = window.pageXOffset || document.documentElement.scrollLeft;
+
+    // Position popup near cursor, but keep it on screen
+    const popupRect = popup.getBoundingClientRect();
+    let left = x - (popupRect.width / 2);
+    let top = y + scrollY - popupRect.height - 10;
+
+    // Keep popup on screen horizontally
+    if (left < scrollX + 10) left = scrollX + 10;
+    if (left + popupRect.width > scrollX + window.innerWidth - 10) {
+        left = scrollX + window.innerWidth - popupRect.width - 10;
+    }
+
+    // If not enough space above, show below cursor
+    if (y - popupRect.height - 10 < 0) {
+        top = y + scrollY + 20;
+    }
+
+    popup.style.left = `${left}px`;
+    popup.style.top = `${top}px`;
+}
+
+function hideHighlightPopup() {
+    document.getElementById('highlight-popup').classList.add('hidden');
+}
+
+async function createHighlight(type, note = null) {
+    if (!currentSelection || !currentArticle) return;
+
+    try {
+        const readerBody = document.getElementById('reader-body');
+        const fullText = readerBody.textContent;
+        const range = currentSelection.range;
+
+        // Calculate character offsets
+        const preRange = document.createRange();
+        preRange.selectNodeContents(readerBody);
+        preRange.setEnd(range.startContainer, range.startOffset);
+        const start = preRange.toString().length;
+        const end = start + currentSelection.text.length;
+
+        // Get context (50 chars before and after)
+        const contextStart = Math.max(0, start - 50);
+        const contextEnd = Math.min(fullText.length, end + 50);
+        const context = fullText.substring(contextStart, contextEnd);
+
+        // Create highlight via API
+        const highlightData = {
+            article_id: currentArticle.id,
+            type: type,
+            text: currentSelection.text,
+            context: context,
+            position: { start, end },
+            color: '#fbbf24',
+            note: note,
+            tags: []
+        };
+
+        const newHighlight = await apiRequest('/highlights', {
+            method: 'POST',
+            body: JSON.stringify(highlightData)
+        });
+
+        // Add to current highlights
+        currentHighlights.push(newHighlight);
+
+        // Apply highlight to DOM
+        applyHighlightToDOM(newHighlight);
+
+        // Clear selection
+        window.getSelection().removeAllRanges();
+        currentSelection = null;
+
+        showToast(type === 'highlight' ? 'Highlighted' : 'Annotation added', 'success');
+    } catch (error) {
+        console.error('Failed to create highlight:', error);
+        showToast('Failed to create ' + type, 'error');
+    }
+}
+
+function applyHighlightToDOM(highlight) {
+    const readerBody = document.getElementById('reader-body');
+    const walker = document.createTreeWalker(
+        readerBody,
+        NodeFilter.SHOW_TEXT,
+        null,
+        false
+    );
+
+    let charCount = 0;
+    const nodesToHighlight = [];
+
+    // Find text nodes that contain the highlight
+    while (walker.nextNode()) {
+        const node = walker.currentNode;
+        const nodeLength = node.textContent.length;
+        const nodeStart = charCount;
+        const nodeEnd = charCount + nodeLength;
+
+        // Check if this node overlaps with the highlight
+        if (nodeEnd > highlight.position.start && nodeStart < highlight.position.end) {
+            const highlightStart = Math.max(0, highlight.position.start - nodeStart);
+            const highlightEnd = Math.min(nodeLength, highlight.position.end - nodeStart);
+
+            nodesToHighlight.push({
+                node: node,
+                start: highlightStart,
+                end: highlightEnd
+            });
+        }
+
+        charCount += nodeLength;
+
+        if (charCount >= highlight.position.end) break;
+    }
+
+    // Apply highlight spans
+    nodesToHighlight.reverse().forEach(item => {
+        const node = item.node;
+        const range = document.createRange();
+        range.setStart(node, item.start);
+        range.setEnd(node, item.end);
+
+        const span = document.createElement('span');
+        span.className = 'highlight';
+        span.dataset.highlightId = highlight.id;
+        span.dataset.type = highlight.type;
+        if (highlight.note) {
+            span.dataset.note = highlight.note;
+        }
+
+        // Add click handler for editing
+        span.addEventListener('click', () => handleHighlightClick(highlight));
+
+        range.surroundContents(span);
+    });
+}
+
+function handleHighlightClick(highlight) {
+    if (highlight.type === 'annotation') {
+        // Show annotation in modal
+        showAnnotationModal(highlight);
+    }
+}
+
+function showAnnotationModal(existingHighlight = null) {
+    const modalContainer = document.getElementById('annotation-modal');
+
+    const modalHTML = `
+        <div class="modal-overlay">
+            <div class="modal-content">
+                <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+                    ${existingHighlight ? 'Edit Annotation' : 'Add Annotation'}
+                </h3>
+                <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                    "${currentSelection ? currentSelection.text : (existingHighlight ? existingHighlight.text : '')}"
+                </p>
+                <textarea id="annotation-text" rows="4" placeholder="Enter your note..."
+                    class="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition resize-none mb-4">${existingHighlight && existingHighlight.note ? existingHighlight.note : ''}</textarea>
+                <div class="flex justify-end gap-3">
+                    <button id="cancel-annotation" class="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition font-medium">
+                        Cancel
+                    </button>
+                    ${existingHighlight ? `
+                    <button id="delete-annotation" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition font-medium">
+                        Delete
+                    </button>` : ''}
+                    <button id="save-annotation" class="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition font-medium">
+                        ${existingHighlight ? 'Update' : 'Save'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    modalContainer.innerHTML = modalHTML;
+    modalContainer.classList.remove('hidden');
+
+    // Focus textarea
+    setTimeout(() => document.getElementById('annotation-text').focus(), 100);
+
+    // Handle buttons
+    document.getElementById('cancel-annotation').addEventListener('click', () => {
+        modalContainer.classList.add('hidden');
+        hideHighlightPopup();
+    });
+
+    document.getElementById('save-annotation').addEventListener('click', async () => {
+        const note = document.getElementById('annotation-text').value.trim();
+        if (!note) {
+            showToast('Please enter a note', 'error');
+            return;
+        }
+
+        if (existingHighlight) {
+            // Update existing
+            await updateAnnotation(existingHighlight.id, note);
+        } else {
+            // Create new
+            await createHighlight('annotation', note);
+        }
+
+        modalContainer.classList.add('hidden');
+        hideHighlightPopup();
+    });
+
+    if (existingHighlight) {
+        document.getElementById('delete-annotation').addEventListener('click', async () => {
+            if (confirm('Delete this annotation?')) {
+                await deleteHighlight(existingHighlight.id);
+                modalContainer.classList.add('hidden');
+            }
+        });
+    }
+}
+
+async function updateAnnotation(highlightId, note) {
+    try {
+        await apiRequest(`/highlights/${highlightId}?article_id=${currentArticle.id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ note })
+        });
+
+        // Update local data
+        const highlight = currentHighlights.find(h => h.id === highlightId);
+        if (highlight) {
+            highlight.note = note;
+            // Update DOM
+            const span = document.querySelector(`[data-highlight-id="${highlightId}"]`);
+            if (span) {
+                span.dataset.note = note;
+            }
+        }
+
+        showToast('Annotation updated', 'success');
+    } catch (error) {
+        showToast('Failed to update annotation', 'error');
+    }
+}
+
+async function deleteHighlight(highlightId) {
+    try {
+        await apiRequest(`/highlights/${highlightId}?article_id=${currentArticle.id}`, {
+            method: 'DELETE'
+        });
+
+        // Remove from local data
+        currentHighlights = currentHighlights.filter(h => h.id !== highlightId);
+
+        // Remove from DOM
+        const spans = document.querySelectorAll(`[data-highlight-id="${highlightId}"]`);
+        spans.forEach(span => {
+            const parent = span.parentNode;
+            while (span.firstChild) {
+                parent.insertBefore(span.firstChild, span);
+            }
+            parent.removeChild(span);
+        });
+
+        showToast('Highlight deleted', 'success');
+    } catch (error) {
+        showToast('Failed to delete highlight', 'error');
+    }
+}
+
+async function loadHighlights(articleId) {
+    try {
+        currentHighlights = currentArticle.highlights || [];
+
+        // Apply all highlights to DOM
+        currentHighlights.forEach(highlight => {
+            applyHighlightToDOM(highlight);
+        });
+    } catch (error) {
+        console.error('Failed to load highlights:', error);
+    }
 }

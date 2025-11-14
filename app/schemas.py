@@ -14,7 +14,7 @@ class UserCreate(UserBase):
 
 
 class UserResponse(UserBase):
-    id: int
+    id: str
     created_at: datetime
 
     class Config:
@@ -41,7 +41,7 @@ class TagCreate(TagBase):
 
 
 class TagResponse(TagBase):
-    id: int
+    id: str
     created_at: datetime
 
     class Config:
@@ -49,19 +49,34 @@ class TagResponse(TagBase):
 
 
 # Highlight Schemas
+class HighlightPosition(BaseModel):
+    start: int
+    end: int
+
+
 class HighlightBase(BaseModel):
-    text: str
-    note: Optional[str] = None
-    color: Optional[str] = "#fbbf24"
+    type: str = Field(..., pattern="^(highlight|annotation)$")  # Either highlight or annotation
+    text: str  # Selected text snippet
+    context: Optional[str] = None  # Surrounding text for matching
+    position: HighlightPosition  # Character offsets
+    color: str = "#fbbf24"  # Default yellow
+    note: Optional[str] = None  # Annotation text (required for type=annotation)
+    tags: List[str] = []  # Tags for categorization
 
 
 class HighlightCreate(HighlightBase):
-    article_id: int
+    article_id: str
+
+
+class HighlightUpdate(BaseModel):
+    note: Optional[str] = None
+    tags: Optional[List[str]] = None
+    color: Optional[str] = None
 
 
 class HighlightResponse(HighlightBase):
-    id: int
-    article_id: int
+    id: str
+    article_id: str
     created_at: datetime
     updated_at: Optional[datetime] = None
 
@@ -87,7 +102,7 @@ class ArticleUpdate(BaseModel):
 
 
 class ArticleResponse(BaseModel):
-    id: int
+    id: str
     url: str
     title: Optional[str] = None
     excerpt: Optional[str] = None

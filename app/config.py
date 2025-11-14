@@ -12,9 +12,11 @@ class Settings(BaseSettings):
     secret_key: str = "your-secret-key-change-this-in-production"
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24 * 7  # 7 days
+    disable_auth: bool = False  # Set to True to disable authentication
 
-    # Database
-    database_url: str = "sqlite:///./data/webreader.db"
+    # Storage
+    data_path: str = "./data"
+    default_user: str = "demo"  # Default user when auth is disabled
 
     # CORS
     cors_origins: list = ["*"]
